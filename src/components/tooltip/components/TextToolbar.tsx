@@ -1,5 +1,5 @@
 import React from 'react';
-import HTMLEditor from '../../lib/index';
+import HTMLEditor from '../../../lib/index';
 import {
   useFontSize,
   useBackgroundColor,
@@ -7,8 +7,8 @@ import {
   useFontWeight,
   useFontStyle,
   useTextDecoration,
-} from '../../hooks/useElementStyles';
-import { styles } from './styles';
+} from '../hooks/useElementStyles';
+import { styles } from '../styles';
 
 interface TextToolbarProps {
   editor: HTMLEditor;

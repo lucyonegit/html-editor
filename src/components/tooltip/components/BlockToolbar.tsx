@@ -1,12 +1,12 @@
 import React from 'react';
-import HTMLEditor from '../../lib/index';
+import HTMLEditor from '../../../lib/index';
 import {
   useBackgroundColor,
   useBorderRadius,
   useBorder,
   useMargin,
-} from '../../hooks/useElementStyles';
-import { styles } from './styles';
+} from '../hooks/useElementStyles';
+import { styles } from '../styles';
 
 interface BlockToolbarProps {
   editor: HTMLEditor;

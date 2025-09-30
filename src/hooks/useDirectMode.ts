@@ -12,7 +12,7 @@ interface UseDirectModeReturn {
 }
 
 export function useDirectMode(
-  containerRef: React.RefObject<HTMLElement | HTMLIFrameElement>,
+  containerRef: React.RefObject<HTMLElement>,
   options?: UseDirectModeOptions
 ): UseDirectModeReturn {
   const editorRef = useRef<HTMLEditor | null>(null);
@@ -22,15 +22,7 @@ export function useDirectMode(
   useEffect(() => {
     if (!containerRef.current) return;
 
-    let targetContainer: HTMLElement;
-
-    if (containerRef.current instanceof HTMLIFrameElement) {
-      const iframeDoc = containerRef.current.contentWindow?.document;
-      if (!iframeDoc || !iframeDoc.body) return;
-      targetContainer = iframeDoc.body;
-    } else {
-      targetContainer = containerRef.current;
-    }
+    const targetContainer = containerRef.current;
 
     const editor = new HTMLEditor({
       styleConfig: options?.styleConfig,

@@ -1,8 +1,8 @@
 import React from 'react';
 import HTMLEditor from '../../lib/index';
-import { TextToolbar } from './TextToolbar';
-import { BlockToolbar } from './BlockToolbar';
-import { ImageToolbar } from './ImageToolbar';
+import { TextToolbar } from './components/TextToolbar';
+import { BlockToolbar } from './components/BlockToolbar';
+import { ImageToolbar } from './components/ImageToolbar';
 import { styles } from './styles';
 
 interface Position {

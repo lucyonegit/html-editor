@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { useInjectMode } from '../hooks/useInjectMode';
+import { useInjectMode } from '../hooks/useIframeMode';
 import Tooltip from '../components/tooltip';
 
 const IframePage: React.FC = () => {
