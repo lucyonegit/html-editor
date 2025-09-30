@@ -97,7 +97,6 @@ export function generateEditorCSS(config: EditorStyleConfig = defaultStyleConfig
     [contenteditable="true"] {
       user-select: text;
       /* Critical: prevent box model changes */
-      box-sizing: inherit !important;
       /* Prevent font/text rendering changes */
       -webkit-font-smoothing: inherit !important;
       -moz-osx-font-smoothing: inherit !important;
@@ -109,7 +108,6 @@ export function generateEditorCSS(config: EditorStyleConfig = defaultStyleConfig
       outline-offset: ${selected.outlineOffset};
       cursor: text !important;
       /* Prevent any layout changes on focus */
-      box-sizing: inherit !important;
     }
 
     /* Prevent height/width changes on contenteditable focus */

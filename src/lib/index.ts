@@ -136,7 +136,15 @@ class HTMLEditor {
 
   // 元素选择
   selectElement(element: HTMLElement): void {
-    if (element === this.selectedElement) return;
+    // 如果是同一个元素，检查是否需要重新启用编辑
+    if (element === this.selectedElement) {
+      // 如果元素不再是 contenteditable，重新启用编辑
+      if (this.options.enableContentEditable && element.getAttribute('contenteditable') !== 'true') {
+        this.enableElementEditing(element);
+      }
+      return;
+    }
+
     this.clearSelection();
     this.selectedElement = element;
     element.classList.add('selected-element');
@@ -166,6 +174,13 @@ class HTMLEditor {
    * 启用元素编辑
    */
   enableElementEditing(element: HTMLElement): void {
+    // 如果已经有事件处理器，先移除避免重复绑定
+    const existingHandlers = (element as any).__editHandlers;
+    if (existingHandlers) {
+      element.removeEventListener('input', existingHandlers.handleInput);
+      element.removeEventListener('blur', existingHandlers.handleBlur);
+    }
+
     // 保存原始的contenteditable状态
     if (!element.hasAttribute('data-original-contenteditable')) {
       const originalValue = element.getAttribute('contenteditable') || 'inherit';
@@ -183,8 +198,8 @@ class HTMLEditor {
     };
 
     const handleBlur = () => {
-      // 失去焦点时可以选择保持或移除contenteditable
-      // 这里我们选择保持，直到clearSelection被调用
+      // 失去焦点时禁用contenteditable
+      this.disableElementEditing(element);
     };
 
     element.addEventListener('input', handleInput);
@@ -326,7 +341,7 @@ class HTMLEditor {
   }
 
   isBlockElement(element: HTMLElement): boolean {
-    const blockTags = ['div', 'section', 'article', 'header', 'footer', 'main'];
+    const blockTags = ['div', 'section', 'article', 'header', 'footer', 'main','body'];
     return blockTags.includes(element.tagName.toLowerCase());
   }
 

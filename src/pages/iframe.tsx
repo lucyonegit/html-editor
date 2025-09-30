@@ -30,6 +30,7 @@ const IframePage: React.FC = () => {
       box-sizing: border-box;
       background-color: #1a1f2e;
       color: #fff;
+      box-sizing: border-box;
       font-family: system-ui, -apple-system, sans-serif;
       min-height: 100%;
       height: 100%;
