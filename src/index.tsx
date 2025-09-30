@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import ReactDomPage from './pages/react-dom';
 import IframePage from './pages/iframe';
-import './styles/global.css';
 
 const App: React.FC = () => {
   return (
