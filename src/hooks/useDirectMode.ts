@@ -1,0 +1,74 @@
+import { useEffect, useRef, useState } from 'react';
+import HTMLEditor, { Position, EditorStyleConfig } from '../lib/index';
+
+interface UseDirectModeOptions {
+  styleConfig?: EditorStyleConfig;
+}
+
+interface UseDirectModeReturn {
+  editor: HTMLEditor | null;
+  selectedElement: HTMLElement | null;
+  position: Position | null;
+}
+
+export function useDirectMode(
+  containerRef: React.RefObject<HTMLElement | HTMLIFrameElement>,
+  options?: UseDirectModeOptions
+): UseDirectModeReturn {
+  const editorRef = useRef<HTMLEditor | null>(null);
+  const [selectedElement, setSelectedElement] = useState<HTMLElement | null>(null);
+  const [position, setPosition] = useState<Position | null>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    let targetContainer: HTMLElement;
+
+    if (containerRef.current instanceof HTMLIFrameElement) {
+      const iframeDoc = containerRef.current.contentWindow?.document;
+      if (!iframeDoc || !iframeDoc.body) return;
+      targetContainer = iframeDoc.body;
+    } else {
+      targetContainer = containerRef.current;
+    }
+
+    const editor = new HTMLEditor({
+      styleConfig: options?.styleConfig,
+      onElementSelect: (element: HTMLElement | null, pos?: Position) => {
+        setSelectedElement(element);
+        setPosition(pos || null);
+      },
+      onStyleChange: (element: HTMLElement) => {
+        if (element) {
+          const rect = element.getBoundingClientRect();
+          setPosition({
+            top: rect.top + window.scrollY,
+            left: rect.left + window.scrollX,
+            width: rect.width,
+            height: rect.height,
+            bottom: rect.bottom + window.scrollY,
+            right: rect.right + window.scrollX
+          });
+        }
+      }
+    });
+
+    editor.init(targetContainer);
+    editorRef.current = editor;
+
+    return () => {
+      if (editorRef.current) {
+        editorRef.current.destroy();
+        editorRef.current = null;
+      }
+    };
+  }, [containerRef, options?.styleConfig]);
+
+  return {
+    editor: editorRef.current,
+    selectedElement,
+    position
+  };
+}
+
+export default useDirectMode;
