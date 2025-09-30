@@ -20,12 +20,19 @@ const IframePage: React.FC = () => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Iframe 编辑器</title>
   <style>
+    html {
+      height: 100%;
+      background-color: #fff;
+    }
     body {
       margin: 0;
       padding: 20px;
+      box-sizing: border-box;
       background-color: #1a1f2e;
       color: #fff;
       font-family: system-ui, -apple-system, sans-serif;
+      min-height: 100%;
+      height: 100%;
     }
     h1 {
       font-size: 32px;

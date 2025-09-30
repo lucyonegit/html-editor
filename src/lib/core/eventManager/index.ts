@@ -51,7 +51,7 @@ export class EventManager {
       e.stopPropagation();
       const target = e.target as HTMLElement;
 
-      if (target === this.editor.container || target.classList.contains('selected-element')) return;
+      if (target.classList.contains('selected-element')) return;
 
       // 先清除容器内所有非选中元素的hover样式
       if (this.editor.container) {
@@ -102,20 +102,13 @@ export class EventManager {
     const handleClick = (e: Event) => {
       const target = e.target as HTMLElement;
 
-      // 如果点击的是容器本身，清除选择
-      if (target === this.editor.container) {
-        e.stopPropagation();
-        this.editor.clearSelection();
-        return;
-      }
-
       // 如果点击的元素已经被选中且可编辑，不要stopPropagation，让contenteditable正常工作
       if (target === this.editor.selectedElement && target.getAttribute('contenteditable') === 'true') {
         // 不阻止事件，让用户可以在元素内部点击定位光标
         return;
       }
 
-      // 否则，选中新元素
+      // 选中元素
       e.stopPropagation();
       this.editor.selectElement(target);
     };

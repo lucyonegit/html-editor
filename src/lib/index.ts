@@ -172,55 +172,6 @@ class HTMLEditor {
       element.setAttribute('data-original-contenteditable', originalValue);
     }
 
-    // 获取当前的实际高度（在设置contenteditable之前）
-    const currentHeight = element.offsetHeight;
-    const currentWidth = element.offsetWidth;
-
-    // 保存当前的计算样式，防止布局变化
-    const computedStyle = window.getComputedStyle(element);
-    const originalStyles = {
-      height: computedStyle.height,
-      minHeight: computedStyle.minHeight,
-      maxHeight: computedStyle.maxHeight,
-      width: computedStyle.width,
-      minWidth: computedStyle.minWidth,
-      maxWidth: computedStyle.maxWidth,
-      padding: computedStyle.padding,
-      paddingTop: computedStyle.paddingTop,
-      paddingBottom: computedStyle.paddingBottom,
-      margin: computedStyle.margin,
-      lineHeight: computedStyle.lineHeight,
-      whiteSpace: computedStyle.whiteSpace,
-      wordBreak: computedStyle.wordBreak,
-      overflowWrap: computedStyle.overflowWrap,
-      boxSizing: computedStyle.boxSizing
-    };
-
-    // 保存原始样式和实际尺寸
-    (element as any).__originalStyles = originalStyles;
-    (element as any).__originalHeight = currentHeight;
-    (element as any).__originalWidth = currentWidth;
-
-    // 在设置contenteditable之前，先锁定所有可能影响布局的属性
-    element.style.boxSizing = originalStyles.boxSizing;
-    element.style.whiteSpace = originalStyles.whiteSpace;
-    element.style.wordBreak = originalStyles.wordBreak;
-    element.style.overflowWrap = originalStyles.overflowWrap;
-    element.style.lineHeight = originalStyles.lineHeight;
-
-    // 强制固定高度，使用实际测量值
-    // 计算内容高度（不包括padding和border）
-    const paddingTop = parseFloat(originalStyles.paddingTop) || 0;
-    const paddingBottom = parseFloat(originalStyles.paddingBottom) || 0;
-
-    if (originalStyles.boxSizing === 'border-box') {
-      // border-box: offsetHeight 已包含 padding
-      element.style.height = currentHeight + 'px';
-    } else {
-      // content-box: 需要减去 padding
-      element.style.height = (currentHeight - paddingTop - paddingBottom) + 'px';
-    }
-
     // 设置为可编辑
     element.setAttribute('contenteditable', 'true');
 
@@ -259,24 +210,6 @@ class HTMLEditor {
       element.removeAttribute('data-original-contenteditable');
     } else {
       element.removeAttribute('contenteditable');
-    }
-
-    // 恢复原始样式
-    const originalStyles = (element as any).__originalStyles;
-    if (originalStyles) {
-      element.style.height = '';
-      element.style.minHeight = '';
-      element.style.maxHeight = '';
-      element.style.width = '';
-      element.style.minWidth = '';
-      element.style.maxWidth = '';
-      element.style.lineHeight = '';
-      element.style.whiteSpace = '';
-      element.style.wordBreak = '';
-      element.style.overflowWrap = '';
-      delete (element as any).__originalStyles;
-      delete (element as any).__originalHeight;
-      delete (element as any).__originalWidth;
     }
 
     // 移除事件监听器
