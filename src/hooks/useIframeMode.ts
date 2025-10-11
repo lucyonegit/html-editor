@@ -54,6 +54,7 @@ export function useInjectMode(
         }
       },
       onStyleChange: (element: HTMLElement) => {
+        debugger
         if (element && iframeRef.current) {
           const rect = element.getBoundingClientRect();
           const iframeRect = iframeRef.current.getBoundingClientRect();
@@ -77,6 +78,7 @@ export function useInjectMode(
         }
       },
       onContentChange: () => {
+        debugger
         // 触发内容变化回调
         if (options?.onContentChange && iframeRef.current) {
           const iframeDoc = iframeRef.current.contentWindow?.document;

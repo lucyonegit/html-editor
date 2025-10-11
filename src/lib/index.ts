@@ -5,6 +5,7 @@
 import EventManager from './core/eventManager';
 import StyleManager from './core/styleManager';
 import { EditorStyleConfig, defaultStyleConfig, generateEditorCSS } from './config/styles';
+import { getElementType, createElement } from './core/utils';
 
 interface Position {
   top: number;
@@ -27,9 +28,7 @@ interface HTMLEditorOptions {
   onReady?: (() => void) | null;
 }
 
-interface TypeMap {
-  [key: string]: string;
-}
+
 
 class HTMLEditor {
   options: HTMLEditorOptions;
@@ -148,7 +147,7 @@ class HTMLEditor {
     this.clearSelection();
     this.selectedElement = element;
     element.classList.add('selected-element');
-    element.setAttribute('data-element-type', this.getElementType(element));
+    element.setAttribute('data-element-type', getElementType(element));
 
     // 如果启用contenteditable，使元素可编辑
     if (this.options.enableContentEditable) {
@@ -285,7 +284,7 @@ class HTMLEditor {
 
   // 元素操作
   addElement(type: string, content: string = ''): HTMLElement {
-    const element = this.createElement(type, content);
+    const element = createElement(type, content);
     if (this.container) {
       this.container.appendChild(element);
     }
@@ -303,51 +302,9 @@ class HTMLEditor {
     return true;
   }
 
-  createElement(type: string, content: string = ''): HTMLElement {
-    const element = document.createElement(type);
 
-    if (content) {
-      element.textContent = content;
-    } else {
-      element.textContent = type === 'div' ? '新区块' : '新文本';
-    }
 
-    // 添加基础样式
-    element.style.padding = '10px';
-    element.style.margin = '5px';
-    element.style.backgroundColor = '#f8f9fa';
-    element.style.border = '1px dashed #dee2e6';
-    element.style.borderRadius = '4px';
-
-    return element;
-  }
-
-  // 工具函数
-  getElementType(element: HTMLElement): string {
-    const tagName = element.tagName.toLowerCase();
-    const typeMap: TypeMap = {
-      'h1': '标题1', 'h2': '标题2', 'h3': '标题3',
-      'h4': '标题4', 'h5': '标题5', 'h6': '标题6',
-      'p': '段落', 'div': '区块', 'span': '文本',
-      'a': '链接', 'img': '图片',
-      'ul': '无序列表', 'ol': '有序列表', 'li': '列表项'
-    };
-    return typeMap[tagName] || tagName.toUpperCase();
-  }
-
-  isTextElement(element: HTMLElement): boolean {
-    const textTags = ['p', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'strong', 'em'];
-    return textTags.includes(element.tagName.toLowerCase());
-  }
-
-  isBlockElement(element: HTMLElement): boolean {
-    const blockTags = ['div', 'section', 'article', 'header', 'footer', 'main','body'];
-    return blockTags.includes(element.tagName.toLowerCase());
-  }
-
-  isImageElement(element: HTMLElement): boolean {
-    return element.tagName.toLowerCase() === 'img';
-  }
+  // 工具函数已抽离到 ./core/utils
 
   // 事件系统
   emit(eventName: string, ...args: any[]): void {

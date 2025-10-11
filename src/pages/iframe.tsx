@@ -145,7 +145,7 @@ const IframePage: React.FC = () => {
 
       {updatedSrcDoc && (
         <div style={styles.debugPanel}>
-          <h3 style={styles.debugTitle}>更新后的 srcDoc (前500字符):</h3>
+          <h3 style={styles.debugTitle}>更新后的 srcDoc:</h3>
           <pre style={styles.debugContent}>
             {updatedSrcDoc}
           </pre>

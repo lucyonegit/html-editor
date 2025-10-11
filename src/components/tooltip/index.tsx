@@ -4,6 +4,7 @@ import { TextToolbar } from './components/TextToolbar';
 import { BlockToolbar } from './components/BlockToolbar';
 import { ImageToolbar } from './components/ImageToolbar';
 import { styles } from './styles';
+import { isTextElement, isBlockElement, isImageElement} from '../../lib/core/utils';
 
 interface Position {
   top: number;
@@ -23,9 +24,9 @@ interface TooltipProps {
 export const Tooltip: React.FC<TooltipProps> = ({ editor, element, position }) => {
   if (!editor || !element || !position || !editor.styleManager) return null;
 
-  const isTextElement = editor.isTextElement(element);
-  const isBlockElement = editor.isBlockElement(element);
-  const isImageElement = editor.isImageElement(element);
+  const isText = isTextElement(element);
+  const isBlock = isBlockElement(element);
+  const isImage = isImageElement(element);
 
   const handleDelete = () => {
     editor.deleteElement(element);
@@ -39,9 +40,9 @@ export const Tooltip: React.FC<TooltipProps> = ({ editor, element, position }) =
 
   return (
     <div style={tooltipStyle} className="floating-toolbar">
-      {isTextElement && <TextToolbar editor={editor} element={element} onDelete={handleDelete} />}
-      {isBlockElement && <BlockToolbar editor={editor} element={element} onDelete={handleDelete} />}
-      {isImageElement && <ImageToolbar onDelete={handleDelete} />}
+      {isText && <TextToolbar editor={editor} element={element} onDelete={handleDelete} />}
+      {isBlock && <BlockToolbar editor={editor} element={element} onDelete={handleDelete} />}
+      {isImage && <ImageToolbar onDelete={handleDelete} />}
     </div>
   );
 };

@@ -97,8 +97,10 @@ export class StyleManager {
   changeBackground(element: HTMLElement | null, backgroundColor: string): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
+    // 同步设置 background 与 backgroundColor，避免不生效
     element.style.backgroundColor = backgroundColor;
-    this.editor.emit('styleChange', element, { backgroundColor });
+    element.style.background = backgroundColor;
+    this.editor.emit('styleChange', element, { backgroundColor, background: backgroundColor });
     return true;
   }
 
@@ -130,8 +132,24 @@ export class StyleManager {
   applyBlockStyle(property: string, value: string): boolean {
     if (!this.editor.selectedElement) return false;
 
-    (this.editor.selectedElement.style as any)[property] = value;
-    this.editor.emit('styleChange', this.editor.selectedElement, { [property]: value });
+    const el = this.editor.selectedElement;
+    const style = el.style as any;
+
+    // 兼容传入 'background-color' 字符串，转为 camelCase
+    const prop = property === 'background-color' ? 'backgroundColor' : property;
+
+    // 常规赋值
+    style[prop] = value;
+
+    // 当设置背景相关属性时，同时更新 background 与 backgroundColor
+    if (prop === 'background' || prop === 'backgroundColor') {
+      style.backgroundColor = value;
+      style.background = value;
+      this.editor.emit('styleChange', el, { backgroundColor: value, background: value });
+      return true;
+    }
+
+    this.editor.emit('styleChange', el, { [prop]: value });
     return true;
   }
 

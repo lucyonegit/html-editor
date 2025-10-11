@@ -4,6 +4,7 @@
  */
 
 import type HTMLEditor from '../../index';
+import { getElementType } from '../utils';
 
 interface Position {
   top: number;
@@ -65,7 +66,7 @@ export class EventManager {
       }
 
       target.classList.add('hover-highlight');
-      target.setAttribute('data-element-type', this.editor.getElementType(target));
+      target.setAttribute('data-element-type', getElementType(target));
 
       // 触发hover事件，包含位置信息
       const rect = target.getBoundingClientRect();
