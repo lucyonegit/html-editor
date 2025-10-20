@@ -3,17 +3,9 @@
  * 事件管理器，处理所有DOM事件
  */
 
-import type HTMLEditor from '../../index';
+import { type HTMLEditor } from '../editor';
+import type { Position } from '../../types';
 import { getElementType } from '../utils';
-
-interface Position {
-  top: number;
-  left: number;
-  width: number;
-  height: number;
-  bottom: number;
-  right: number;
-}
 
 type EventHandler = (e: Event) => void;
 
@@ -21,13 +13,13 @@ export class EventManager {
   private editor: HTMLEditor;
   private boundHandlers: Map<string, EventHandler>;
   private isIframe: boolean;
-  private iframeDoc: Document | null;
+
 
   constructor(editor: HTMLEditor) {
     this.editor = editor;
     this.boundHandlers = new Map<string, EventHandler>();
     this.isIframe = false;
-    this.iframeDoc = null;
+
   }
 
   bindAll(): void {
@@ -43,7 +35,7 @@ export class EventManager {
     // 检查container是否在iframe中
     if (this.editor.container && this.editor.container.ownerDocument !== document) {
       this.isIframe = true;
-      this.iframeDoc = this.editor.container.ownerDocument;
+
     }
   }
 
@@ -52,12 +44,12 @@ export class EventManager {
       e.stopPropagation();
       const target = e.target as HTMLElement;
 
-      if (target.classList.contains('selected-element')) return;
+      if (target.classList.contains('selected-element') || target.classList.contains('moveable-line')) return;
 
       // 先清除容器内所有非选中元素的hover样式
       if (this.editor.container) {
         const doc = this.editor.container.ownerDocument;
-        doc.querySelectorAll('.hover-highlight').forEach(el => {
+        doc.querySelectorAll('.hover-highlight').forEach((el: Element) => {
           if (!el.classList.contains('selected-element')) {
             el.classList.remove('hover-highlight');
             el.removeAttribute('data-element-type');

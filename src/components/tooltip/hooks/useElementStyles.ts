@@ -14,15 +14,9 @@ const rgbToHex = (rgb: string): string => {
   }).join('');
 };
 
-// 辅助函数：读取样式
-const readStyle = (element: HTMLElement, property: keyof CSSStyleDeclaration): string => {
-  return window.getComputedStyle(element)[property] as string;
-};
-
 // Hook: 读取字体大小
 export const useFontSize = (element: HTMLElement | null) => {
   const [fontSize, setFontSize] = useState('16');
-  const [updateTrigger, setUpdateTrigger] = useState(0);
 
   useEffect(() => {
     if (!element) return;
@@ -46,7 +40,7 @@ export const useFontSize = (element: HTMLElement | null) => {
     });
 
     return () => observer.disconnect();
-  }, [element, updateTrigger]);
+  }, [element]);
 
   return [fontSize, setFontSize] as const;
 };

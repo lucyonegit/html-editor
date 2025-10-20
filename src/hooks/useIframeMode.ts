@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import HTMLEditor, { Position, EditorStyleConfig } from '../lib/index';
+import { HTMLEditor, Position, EditorStyleConfig } from '../lib/index';
 
 interface UseInjectModeOptions {
   styleConfig?: EditorStyleConfig;
@@ -10,10 +10,92 @@ interface UseInjectModeReturn {
   editor: HTMLEditor | null;
   selectedElement: HTMLElement | null;
   position: Position | null;
-  injectScript: () => void;
+  injectScript: (targetContainer: HTMLElement) => Promise<void>;
 }
 
-export function useInjectMode(
+const waitForDOMStable = (iframeDoc: HTMLElement, timeout = 5000): Promise<void> => {
+  return new Promise((resolve) => {
+    let timer: any;
+    const observer = new MutationObserver(() => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        observer.disconnect();
+        resolve();
+      }, 500);
+    });
+
+    observer.observe(iframeDoc, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+    });
+
+    // 超时保护
+    setTimeout(() => {
+      observer.disconnect();
+      clearTimeout(timer);
+      resolve();
+    }, timeout);
+  });
+};
+
+const waitForIframeReady = (iframe: HTMLIFrameElement, timeout = 5000): Promise<void> => {
+  return new Promise((resolve) => {
+    const start = performance.now();
+
+    const tryAttach = () => {
+      const doc = iframe.contentDocument;
+      if (!doc) {
+        if (performance.now() - start > timeout) return resolve();
+        return requestAnimationFrame(tryAttach);
+      }
+
+      // 如果已经 complete，直接 resolve
+      if (doc.readyState === 'complete') {
+        return resolve();
+      }
+
+      let stableTimer: any;
+      const observer = new MutationObserver(() => {
+        clearTimeout(stableTimer);
+        stableTimer = setTimeout(() => {
+          observer.disconnect();
+          resolve();
+        }, 800);
+      });
+
+      observer.observe(doc.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+      });
+
+      // 超时保护
+      setTimeout(() => {
+        observer.disconnect();
+        clearTimeout(stableTimer);
+        resolve();
+      }, timeout);
+
+      // 同时监听 readyState
+      const checkReady = () => {
+        if (doc.readyState === 'complete') {
+          observer.disconnect();
+          clearTimeout(stableTimer);
+          resolve();
+        } else if (performance.now() - start < timeout) {
+          requestAnimationFrame(checkReady);
+        }
+      };
+      checkReady();
+    };
+
+    tryAttach();
+  });
+};
+
+
+export function useIframeMode(
   iframeRef: React.RefObject<HTMLIFrameElement>,
   options?: UseInjectModeOptions
 ): UseInjectModeReturn {
@@ -21,18 +103,11 @@ export function useInjectMode(
   const [selectedElement, setSelectedElement] = useState<HTMLElement | null>(null);
   const [position, setPosition] = useState<Position | null>(null);
 
-  const injectScript = useCallback(() => {
-    if (!iframeRef.current) return;
-
-    const iframeDoc = iframeRef.current.contentWindow?.document;
-    if (!iframeDoc) return;
-
-    const targetContainer = iframeDoc.body;
-
+  const injectScript = async (targetContainer: HTMLElement) => {
+    if (!targetContainer) return;
     if (editorRef.current) {
       editorRef.current.destroy();
     }
-
     const editor = new HTMLEditor({
       styleConfig: options?.styleConfig,
       onElementSelect: (element: HTMLElement | null, pos?: Position) => {
@@ -54,7 +129,6 @@ export function useInjectMode(
         }
       },
       onStyleChange: (element: HTMLElement) => {
-        debugger
         if (element && iframeRef.current) {
           const rect = element.getBoundingClientRect();
           const iframeRect = iframeRef.current.getBoundingClientRect();
@@ -78,7 +152,6 @@ export function useInjectMode(
         }
       },
       onContentChange: () => {
-        debugger
         // 触发内容变化回调
         if (options?.onContentChange && iframeRef.current) {
           const iframeDoc = iframeRef.current.contentWindow?.document;
@@ -87,40 +160,29 @@ export function useInjectMode(
             options.onContentChange(srcDoc);
           }
         }
-      }
+      },
+      enableMoveable: false,
     });
-
     editor.init(targetContainer);
     editorRef.current = editor;
-  }, [iframeRef, options?.styleConfig]);
+  };
 
   useEffect(() => {
-    if (!iframeRef.current) return;
-
     const iframe = iframeRef.current;
-
-    const handleLoad = () => {
-      setTimeout(() => {
-        injectScript();
-      }, 100);
-    };
-
-    if (iframe.contentWindow?.document.readyState === 'complete') {
-      setTimeout(() => {
-        injectScript();
-      }, 100);
-    } else {
-      iframe.addEventListener('load', handleLoad);
+    if (!iframe) return;
+    const onLoad = async () => {
+      const doc = iframe.contentDocument!;
+      console.time('useIframeMode');
+      await waitForIframeReady(iframe);
+      console.timeEnd('useIframeMode');
+      console.log('编辑器加载完成', doc);
+      injectScript(doc.body);
     }
-
+    iframe.addEventListener('load', onLoad);
     return () => {
-      iframe.removeEventListener('load', handleLoad);
-      if (editorRef.current) {
-        editorRef.current.destroy();
-        editorRef.current = null;
-      }
-    };
-  }, [iframeRef, injectScript, options?.styleConfig]);
+      iframe.removeEventListener('load', onLoad);
+    }
+  },[])
 
   return {
     editor: editorRef.current,
@@ -130,4 +192,4 @@ export function useInjectMode(
   };
 }
 
-export default useInjectMode;
+export default useIframeMode;

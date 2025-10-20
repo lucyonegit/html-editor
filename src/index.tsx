@@ -3,25 +3,26 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import ReactDomPage from './pages/react-dom';
 import IframePage from './pages/iframe';
+import './styles/global.css'
 
 const App: React.FC = () => {
   return (
     <BrowserRouter>
       <div style={styles.container}>
         <nav style={styles.nav}>
-          <h1 style={styles.title}>HTML Visual Editor</h1>
+          {/* <h1 style={styles.title}>HTML Visual Editor</h1> */}
           <div style={styles.links}>
             <Link to="/" style={styles.link}>React DOM Editor</Link>
             <Link to="/iframe" style={styles.link}>Iframe Editor</Link>
           </div>
         </nav>
 
-        <main style={styles.main}>
+        <div style={styles.main}>
           <Routes>
             <Route path="/" element={<ReactDomPage />} />
             <Route path="/iframe" element={<IframePage />} />
           </Routes>
-        </main>
+        </div>
       </div>
     </BrowserRouter>
   );
@@ -57,9 +58,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     borderRadius: '4px',
     fontSize: '14px',
     transition: 'background-color 0.2s',
-  },
-  main: {
-    padding: '20px',
   },
 };
 

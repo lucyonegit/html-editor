@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import HTMLEditor, { Position, EditorStyleConfig } from '../lib/index';
+import {HTMLEditor, Position, EditorStyleConfig } from '../lib';
 
 interface UseDirectModeOptions {
   styleConfig?: EditorStyleConfig;

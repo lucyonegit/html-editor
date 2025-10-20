@@ -9,10 +9,10 @@ const ReactDomPage: React.FC = () => {
   return (
     <div style={styles.page}>
       <div style={styles.header}>
-        <h2 style={styles.pageTitle}>React DOM 编辑器</h2>
+        {/* <h2 style={styles.pageTitle}>React DOM 编辑器</h2>
         <p style={styles.description}>
           通过 React ref 直接编辑 DOM 元素。鼠标悬停高亮，点击选中后可进行编辑。
-        </p>
+        </p> */}
       </div>
 
       <div style={styles.editorWrapper}>

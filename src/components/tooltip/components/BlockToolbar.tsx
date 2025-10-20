@@ -1,5 +1,5 @@
 import React from 'react';
-import HTMLEditor from '../../../lib/index';
+import { HTMLEditor } from '../../../lib';
 import {
   useBackgroundColor,
   useBorderRadius,

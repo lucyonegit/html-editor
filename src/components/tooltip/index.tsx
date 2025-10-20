@@ -1,5 +1,5 @@
 import React from 'react';
-import HTMLEditor from '../../lib/index';
+import { HTMLEditor } from '../../lib';
 import { TextToolbar } from './components/TextToolbar';
 import { BlockToolbar } from './components/BlockToolbar';
 import { ImageToolbar } from './components/ImageToolbar';

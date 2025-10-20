@@ -3,22 +3,8 @@
  * 样式管理器，处理元素样式的应用和获取
  */
 
-import type HTMLEditor from '../../index';
-
-interface StyleChange {
-  [key: string]: string;
-}
-
-interface ElementStyles {
-  fontSize: string;
-  color: string;
-  fontWeight: string;
-  backgroundColor: string;
-  borderWidth: string;
-  padding: string;
-  margin: string;
-  borderRadius: string;
-}
+import { type HTMLEditor } from '../editor';
+import type { ElementStyles } from '../../types';
 
 export class StyleManager {
   private editor: HTMLEditor;

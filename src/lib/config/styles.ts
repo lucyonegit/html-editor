@@ -3,49 +3,16 @@
  * 编辑器样式配置
  */
 
-export interface EditorStyleConfig {
-  // Hover 样式配置
-  hover: {
-    outline?: string;
-    outlineOffset?: string;
-    cursor?: string;
-    backgroundColor?: string;
-  };
-  // Focus/Selected 样式配置
-  selected: {
-    outline?: string;
-    outlineOffset?: string;
-    cursor?: string;
-    backgroundColor?: string;
-  };
-  // 角标样式配置
-  badge: {
-    enabled?: boolean;
-    position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
-    offset?: {
-      top?: string;
-      left?: string;
-      right?: string;
-      bottom?: string;
-    };
-    background?: string;
-    color?: string;
-    padding?: string;
-    borderRadius?: string;
-    fontSize?: string;
-    fontFamily?: string;
-    zIndex?: number;
-  };
-}
+import { EditorStyleConfig } from "../types";
 
 export const defaultStyleConfig: EditorStyleConfig = {
   hover: {
-    outline: '2px dashed #4dabf7',
-    outlineOffset: '2px',
+    outline: '1px dashed #4dabf7',
+    outlineOffset: '0px',
     cursor: 'pointer',
   },
   selected: {
-    outline: '2px solid #228be6',
+    outline: '1px solid #228be6',
     outlineOffset: '2px',
     cursor: 'pointer',
   },
@@ -70,7 +37,7 @@ export const defaultStyleConfig: EditorStyleConfig = {
  * Generate CSS from style configuration
  * 从样式配置生成CSS
  */
-export function generateEditorCSS(config: EditorStyleConfig = defaultStyleConfig): string {
+export function generateEditorCSS(config: EditorStyleConfig = defaultStyleConfig, enableMoveable: boolean | undefined): string {
   const { hover, selected, badge } = config;
 
   let css = `
@@ -87,7 +54,7 @@ export function generateEditorCSS(config: EditorStyleConfig = defaultStyleConfig
     }
 
     .selected-element {
-      outline: ${selected.outline} !important;
+      outline: ${enableMoveable ? 'none' : selected.outline} !important;
       outline-offset: ${selected.outlineOffset};
       cursor: ${selected.cursor};
       ${selected.backgroundColor ? `background-color: ${selected.backgroundColor} !important;` : ''}
@@ -104,7 +71,7 @@ export function generateEditorCSS(config: EditorStyleConfig = defaultStyleConfig
     }
 
     [contenteditable="true"]:focus {
-      outline: ${selected.outline} !important;
+      outline: ${enableMoveable ? 'none' : selected.outline} !important;
       outline-offset: ${selected.outlineOffset};
       cursor: text !important;
       /* Prevent any layout changes on focus */
