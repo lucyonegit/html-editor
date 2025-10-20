@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { HTMLEditor, Position, EditorStyleConfig } from '../lib/index';
 
 interface UseInjectModeOptions {
@@ -12,32 +12,6 @@ interface UseInjectModeReturn {
   position: Position | null;
   injectScript: (targetContainer: HTMLElement) => Promise<void>;
 }
-
-const waitForDOMStable = (iframeDoc: HTMLElement, timeout = 5000): Promise<void> => {
-  return new Promise((resolve) => {
-    let timer: any;
-    const observer = new MutationObserver(() => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        observer.disconnect();
-        resolve();
-      }, 500);
-    });
-
-    observer.observe(iframeDoc, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-    });
-
-    // 超时保护
-    setTimeout(() => {
-      observer.disconnect();
-      clearTimeout(timer);
-      resolve();
-    }, timeout);
-  });
-};
 
 const waitForIframeReady = (iframe: HTMLIFrameElement, timeout = 5000): Promise<void> => {
   return new Promise((resolve) => {
@@ -140,15 +114,6 @@ export function useIframeMode(
             bottom: rect.bottom + iframeRect.top + window.scrollY,
             right: rect.right + iframeRect.left + window.scrollX
           });
-
-          // 触发内容变化回调
-          if (options?.onContentChange) {
-            const iframeDoc = iframeRef.current.contentWindow?.document;
-            if (iframeDoc) {
-              const srcDoc = iframeDoc.documentElement.outerHTML;
-              options.onContentChange(srcDoc);
-            }
-          }
         }
       },
       onContentChange: () => {
@@ -161,7 +126,7 @@ export function useIframeMode(
           }
         }
       },
-      enableMoveable: false,
+      enableMoveable: true,
     });
     editor.init(targetContainer);
     editorRef.current = editor;

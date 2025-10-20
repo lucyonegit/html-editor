@@ -19,6 +19,12 @@ export class HTMLEditor {
   moveableManager: MoveableManager | null;
   container: HTMLElement | null;
 
+  // 操作状态
+  isDragging: boolean = false;
+  isResizing: boolean = false;
+  isChangingBackground: boolean = false;
+  isChangingColor: boolean = false;
+
   constructor(options: HTMLEditorOptions = {}) {
     this.options = {
       container: null,
@@ -323,6 +329,44 @@ export class HTMLEditor {
 
   getSelectedElement(): HTMLElement | null {
     return this.selectedElement;
+  }
+
+  // 操作状态管理
+  setDragging(value: boolean): void {
+    this.isDragging = value;
+  }
+
+  setResizing(value: boolean): void {
+    this.isResizing = value;
+  }
+
+  setChangingBackground(value: boolean): void {
+    this.isChangingBackground = value;
+  }
+
+  setChangingColor(value: boolean): void {
+    this.isChangingColor = value;
+  }
+  /**
+   * 检查是否有任何操作正在进行
+   */
+  isOperating(): boolean {
+    return (
+      this.isDragging ||
+      this.isResizing ||
+      this.isChangingBackground ||
+      this.isChangingColor
+    );
+  }
+
+  /**
+   * 重置所有操作状态
+   */
+  resetOperationStates(): void {
+    this.isDragging = false;
+    this.isResizing = false;
+    this.isChangingBackground = false;
+    this.isChangingColor = false;
   }
 
   destroy(): void {

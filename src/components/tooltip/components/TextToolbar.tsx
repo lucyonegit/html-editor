@@ -119,7 +119,12 @@ export const TextToolbar: React.FC<TextToolbarProps> = ({ editor, element, onDel
               value={textColor}
               onChange={(e) => {
                 setTextColor(e.target.value);
-                styleManager.changeColor(element, e.target.value);
+                editor.setChangingColor(true);
+                styleManager.changeColor(element, e.target.value, false);
+              }}
+              onBlur={(e) => {
+                editor.setChangingColor(false);
+                styleManager.changeColor(element, e.target.value, true);
               }}
               style={styles.colorInput}
               title="文字颜色"
@@ -132,7 +137,12 @@ export const TextToolbar: React.FC<TextToolbarProps> = ({ editor, element, onDel
               value={bgColor}
               onChange={(e) => {
                 setBgColor(e.target.value);
-                styleManager.changeBackground(element, e.target.value);
+                editor.setChangingBackground(true);
+                styleManager.changeBackground(element, e.target.value, false);
+              }}
+              onBlur={(e) => {
+                editor.setChangingBackground(false);
+                styleManager.changeBackground(element, e.target.value, true);
               }}
               style={styles.colorInput}
               title="背景色"

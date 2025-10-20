@@ -72,21 +72,27 @@ export class StyleManager {
   }
 
   // 颜色相关方法
-  changeColor(element: HTMLElement | null, color: string): boolean {
+  changeColor(element: HTMLElement | null, color: string, triggerContentChange = true): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
     element.style.color = color;
     this.editor.emit('styleChange', element, { color });
+    if (triggerContentChange) {
+      this.editor.emit('contentChange');
+    }
     return true;
   }
 
-  changeBackground(element: HTMLElement | null, backgroundColor: string): boolean {
+  changeBackground(element: HTMLElement | null, backgroundColor: string, triggerContentChange = true): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
     // 同步设置 background 与 backgroundColor，避免不生效
     element.style.backgroundColor = backgroundColor;
     element.style.background = backgroundColor;
     this.editor.emit('styleChange', element, { backgroundColor, background: backgroundColor });
+    if (triggerContentChange) {
+      this.editor.emit('contentChange');
+    }
     return true;
   }
 
@@ -99,11 +105,14 @@ export class StyleManager {
     return true;
   }
 
-  changeBorderRadius(element: HTMLElement | null, borderRadius: string): boolean {
+  changeBorderRadius(element: HTMLElement | null, borderRadius: string, triggerContentChange = true): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
     element.style.borderRadius = borderRadius;
     this.editor.emit('styleChange', element, { borderRadius });
+    if (triggerContentChange) {
+      this.editor.emit('contentChange');
+    }
     return true;
   }
 

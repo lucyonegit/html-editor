@@ -34,7 +34,12 @@ export const BlockToolbar: React.FC<BlockToolbarProps> = ({ editor, element, onD
               value={bgColor}
               onChange={(e) => {
                 setBgColor(e.target.value);
-                styleManager.changeBackground(element, e.target.value);
+                editor.setChangingBackground(true);
+                styleManager.changeBackground(element, e.target.value, false);
+              }}
+              onBlur={(e) => {
+                editor.setChangingBackground(false);
+                styleManager.changeBackground(element, e.target.value, true);
               }}
               style={styles.colorInput}
               title="背景色"
@@ -58,7 +63,15 @@ export const BlockToolbar: React.FC<BlockToolbarProps> = ({ editor, element, onD
             value={borderRadius}
             onChange={(e) => {
               setBorderRadius(e.target.value);
-              styleManager.changeBorderRadius(element, e.target.value + 'px');
+              styleManager.changeBorderRadius(element, e.target.value + 'px', false);
+            }}
+            onMouseUp={() => {
+              // 鼠标释放时触发 contentChange
+              styleManager.changeBorderRadius(element, borderRadius + 'px', true);
+            }}
+            onTouchEnd={() => {
+              // 触摸结束时触发 contentChange
+              styleManager.changeBorderRadius(element, borderRadius + 'px', true);
             }}
             style={styles.rangeInput}
             title={`圆角 ${borderRadius}px`}

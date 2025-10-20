@@ -123,12 +123,12 @@ export class MoveableManager {
         inputEvent?.preventDefault();
       } catch {}
       el.style.userSelect = "none";
+      this.editor.setDragging(true);
     });
     this.instance.on("drag", ({ target, transform }) => {
       const el = target as HTMLElement;
       el.style.transform = transform;
       this.editor.emit("styleChange", el, { transform });
-      this.editor.emit("contentChange");
     });
     this.instance.on("dragEnd", ({ target }) => {
       // 拖拽结束恢复 userSelect（最终完整恢复在 destroy 中进行）
@@ -138,9 +138,15 @@ export class MoveableManager {
       } else {
         el.style.removeProperty("user-select");
       }
+      this.editor.setDragging(false);
+      // 拖拽结束时触发 contentChange
+      this.editor.emit("contentChange");
     });
 
     // 缩放事件：更新尺寸，并用 drag.transform 同步位置（如有）
+    this.instance.on("resizeStart", () => {
+      this.editor.setResizing(true);
+    });
     this.instance.on("resize", ({ target, width, height, drag }) => {
       const el = target as HTMLElement;
       el.style.width = `${width}px`;
@@ -159,7 +165,10 @@ export class MoveableManager {
           height: `${height}px`,
         });
       }
-
+    });
+    this.instance.on("resizeEnd", () => {
+      this.editor.setResizing(false);
+      // 缩放结束时触发 contentChange
       this.editor.emit("contentChange");
     });
   }

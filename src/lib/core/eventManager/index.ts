@@ -41,6 +41,11 @@ export class EventManager {
 
   bindHoverEvents(): void {
     const handleMouseOver = (e: Event) => {
+      // 如果正在进行拖动、缩放等操作，不处理 hover
+      if (this.editor.isOperating()) {
+        return;
+      }
+
       e.stopPropagation();
       const target = e.target as HTMLElement;
 
@@ -95,6 +100,11 @@ export class EventManager {
     const handleClick = (e: Event) => {
       const target = e.target as HTMLElement;
 
+      // 如果正在进行拖动或缩放操作，不处理点击
+      if (this.editor.isDragging || this.editor.isResizing) {
+        return;
+      }
+
       // 如果点击的元素已经被选中且可编辑，不要stopPropagation，让contenteditable正常工作
       if (target === this.editor.selectedElement && target.getAttribute('contenteditable') === 'true') {
         // 不阻止事件，让用户可以在元素内部点击定位光标
@@ -115,6 +125,12 @@ export class EventManager {
   bindDocumentEvents(): void {
     const handleDocumentClick = (e: Event) => {
       const target = e.target as HTMLElement;
+
+      // 如果正在进行操作，不清除选择
+      if (this.editor.isOperating()) {
+        return;
+      }
+
       if (this.editor.container &&
           !this.editor.container.contains(target) &&
           !target.closest('.floating-toolbar')) {
