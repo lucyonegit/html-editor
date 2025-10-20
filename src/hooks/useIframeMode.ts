@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { HTMLEditor, Position, EditorStyleConfig } from '../lib/index';
+import { HTMLEditor, Position, EditorStyleConfig, HistoryState } from '../lib/index';
 
 interface UseInjectModeOptions {
   styleConfig?: EditorStyleConfig;
   onContentChange?: (srcDoc: string) => void;
+  onHistoryChange?: (state: HistoryState) => void;
 }
 
 interface UseInjectModeReturn {
@@ -11,6 +12,12 @@ interface UseInjectModeReturn {
   selectedElement: HTMLElement | null;
   position: Position | null;
   injectScript: (targetContainer: HTMLElement) => Promise<void>;
+  // 历史记录相关
+  canUndo: boolean;
+  canRedo: boolean;
+  undo: () => boolean;
+  redo: () => boolean;
+  clearHistory: () => void;
 }
 
 const waitForIframeReady = (iframe: HTMLIFrameElement, timeout = 5000): Promise<void> => {
@@ -76,6 +83,8 @@ export function useIframeMode(
   const editorRef = useRef<HTMLEditor | null>(null);
   const [selectedElement, setSelectedElement] = useState<HTMLElement | null>(null);
   const [position, setPosition] = useState<Position | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
 
   const injectScript = async (targetContainer: HTMLElement) => {
     if (!targetContainer) return;
@@ -126,7 +135,18 @@ export function useIframeMode(
           }
         }
       },
+      onHistoryChange: (state: HistoryState) => {
+        setCanUndo(state.canUndo);
+        setCanRedo(state.canRedo);
+        options?.onHistoryChange?.(state);
+        console.log('历史变化', state);
+      },
       enableMoveable: true,
+      enableHistory: true,
+      historyOptions: {
+        maxHistorySize: 100,
+        mergeInterval: 1000,
+      },
     });
     editor.init(targetContainer);
     editorRef.current = editor;
@@ -144,8 +164,29 @@ export function useIframeMode(
       injectScript(doc.body);
     }
     iframe.addEventListener('load', onLoad);
+
+    // 绑定键盘快捷键
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          editorRef.current?.redo();
+        } else {
+          editorRef.current?.undo();
+        }
+      }
+      // Ctrl+Y / Cmd+Y: 重做（Windows 风格）
+      if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        e.preventDefault();
+        editorRef.current?.redo();
+      }
+    };
+
+    iframe.contentDocument?.addEventListener('keydown', handleKeyDown);
+
     return () => {
       iframe.removeEventListener('load', onLoad);
+      iframe.contentDocument?.removeEventListener('keydown', handleKeyDown);
     }
   },[])
 
@@ -153,7 +194,12 @@ export function useIframeMode(
     editor: editorRef.current,
     selectedElement,
     position,
-    injectScript
+    injectScript,
+    canUndo,
+    canRedo,
+    undo: () => editorRef.current?.undo() ?? false,
+    redo: () => editorRef.current?.redo() ?? false,
+    clearHistory: () => editorRef.current?.clearHistory(),
   };
 }
 

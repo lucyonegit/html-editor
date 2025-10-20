@@ -5,6 +5,7 @@
 
 import { type HTMLEditor } from '../editor';
 import type { ElementStyles } from '../../types';
+import { createStyleChangeCommand } from '../historyManager/commands';
 
 export class StyleManager {
   private editor: HTMLEditor;
@@ -13,11 +14,28 @@ export class StyleManager {
     this.editor = editor;
   }
 
+  /**
+   * 应用样式并记录历史
+   */
+  private applyStyleWithHistory(element: HTMLElement, property: string, value: string): void {
+    const oldValue = element.style.getPropertyValue(property);
+
+    // 创建命令并执行
+    if (this.editor.historyManager) {
+      const command = createStyleChangeCommand(element, property, oldValue, value);
+      command.execute();
+      this.editor.historyManager.push(command);
+    } else {
+      // 如果没有历史管理器，直接应用样式
+      element.style.setProperty(property, value);
+    }
+  }
+
   // 字体相关方法
   changeFont(element: HTMLElement | null, fontFamily: string): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
-    element.style.fontFamily = fontFamily;
+    this.applyStyleWithHistory(element, 'font-family', fontFamily);
     this.editor.emit('styleChange', element, { fontFamily });
     return true;
   }
@@ -25,7 +43,7 @@ export class StyleManager {
   changeFontSize(element: HTMLElement | null, fontSize: string): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
-    element.style.fontSize = fontSize;
+    this.applyStyleWithHistory(element, 'font-size', fontSize);
     this.editor.emit('styleChange', element, { fontSize });
     return true;
   }
@@ -33,7 +51,7 @@ export class StyleManager {
   changeFontWeight(element: HTMLElement | null, fontWeight: string): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
-    element.style.fontWeight = fontWeight;
+    this.applyStyleWithHistory(element, 'font-weight', fontWeight);
     this.editor.emit('styleChange', element, { fontWeight });
     return true;
   }
@@ -41,7 +59,7 @@ export class StyleManager {
   changeFontStyle(element: HTMLElement | null, fontStyle: string): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
-    element.style.fontStyle = fontStyle;
+    this.applyStyleWithHistory(element, 'font-style', fontStyle);
     this.editor.emit('styleChange', element, { fontStyle });
     return true;
   }
@@ -49,7 +67,7 @@ export class StyleManager {
   changeTextDecoration(element: HTMLElement | null, textDecoration: string): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
-    element.style.textDecoration = textDecoration;
+    this.applyStyleWithHistory(element, 'text-decoration', textDecoration);
     this.editor.emit('styleChange', element, { textDecoration });
     return true;
   }
@@ -58,7 +76,7 @@ export class StyleManager {
   changeMargin(element: HTMLElement | null, margin: string): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
-    element.style.margin = margin;
+    this.applyStyleWithHistory(element, 'margin', margin);
     this.editor.emit('styleChange', element, { margin });
     return true;
   }
@@ -66,7 +84,7 @@ export class StyleManager {
   changePadding(element: HTMLElement | null, padding: string): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
-    element.style.padding = padding;
+    this.applyStyleWithHistory(element, 'padding', padding);
     this.editor.emit('styleChange', element, { padding });
     return true;
   }
@@ -75,7 +93,7 @@ export class StyleManager {
   changeColor(element: HTMLElement | null, color: string, triggerContentChange = true): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
-    element.style.color = color;
+    this.applyStyleWithHistory(element, 'color', color);
     this.editor.emit('styleChange', element, { color });
     if (triggerContentChange) {
       this.editor.emit('contentChange');
@@ -86,9 +104,11 @@ export class StyleManager {
   changeBackground(element: HTMLElement | null, backgroundColor: string, triggerContentChange = true): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
-    // 同步设置 background 与 backgroundColor，避免不生效
-    element.style.backgroundColor = backgroundColor;
-    element.style.background = backgroundColor;
+    // 使用批量操作记录 background 和 backgroundColor
+    this.editor.beginBatch();
+    this.applyStyleWithHistory(element, 'background-color', backgroundColor);
+    this.applyStyleWithHistory(element, 'background', backgroundColor);
+    this.editor.endBatch();
     this.editor.emit('styleChange', element, { backgroundColor, background: backgroundColor });
     if (triggerContentChange) {
       this.editor.emit('contentChange');
@@ -100,7 +120,7 @@ export class StyleManager {
   changeBorder(element: HTMLElement | null, border: string): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
-    element.style.border = border;
+    this.applyStyleWithHistory(element, 'border', border);
     this.editor.emit('styleChange', element, { border });
     return true;
   }
@@ -108,7 +128,7 @@ export class StyleManager {
   changeBorderRadius(element: HTMLElement | null, borderRadius: string, triggerContentChange = true): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
-    element.style.borderRadius = borderRadius;
+    this.applyStyleWithHistory(element, 'border-radius', borderRadius);
     this.editor.emit('styleChange', element, { borderRadius });
     if (triggerContentChange) {
       this.editor.emit('contentChange');
@@ -118,8 +138,7 @@ export class StyleManager {
 
   applyTextStyle(property: string, value: string): boolean {
     if (!this.editor.selectedElement) return false;
-
-    (this.editor.selectedElement.style as any)[property] = value;
+    this.applyStyleWithHistory(this.editor.selectedElement, property, value);
     this.editor.emit('styleChange', this.editor.selectedElement, { [property]: value });
     return true;
   }
@@ -128,22 +147,21 @@ export class StyleManager {
     if (!this.editor.selectedElement) return false;
 
     const el = this.editor.selectedElement;
-    const style = el.style as any;
 
-    // 兼容传入 'background-color' 字符串，转为 camelCase
-    const prop = property === 'background-color' ? 'backgroundColor' : property;
-
-    // 常规赋值
-    style[prop] = value;
+    // 兼容传入 'background-color' 字符串
+    const prop = property === 'background-color' ? 'background-color' : property;
 
     // 当设置背景相关属性时，同时更新 background 与 backgroundColor
-    if (prop === 'background' || prop === 'backgroundColor') {
-      style.backgroundColor = value;
-      style.background = value;
+    if (prop === 'background' || prop === 'background-color') {
+      this.editor.beginBatch();
+      this.applyStyleWithHistory(el, 'background-color', value);
+      this.applyStyleWithHistory(el, 'background', value);
+      this.editor.endBatch();
       this.editor.emit('styleChange', el, { backgroundColor: value, background: value });
       return true;
     }
 
+    this.applyStyleWithHistory(el, prop, value);
     this.editor.emit('styleChange', el, { [prop]: value });
     return true;
   }

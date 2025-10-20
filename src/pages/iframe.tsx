@@ -7,7 +7,7 @@ const IframePage: React.FC = () => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [updatedSrcDoc, setUpdatedSrcDoc] = useState<string>('');
 
-  const { editor, selectedElement, position } = useIframeMode(iframeRef, {
+  const { editor, selectedElement, position,canRedo,canUndo,undo,redo } = useIframeMode(iframeRef, {
     onContentChange: (srcDoc: string) => {
       console.log('Iframe 内容已更新');
       setUpdatedSrcDoc(srcDoc);
@@ -17,6 +17,8 @@ const IframePage: React.FC = () => {
   return (
     <div style={styles.page}>
       <div style={styles.header}>
+        <button onClick={undo} disabled={!canUndo} style={{marginRight: '8px'}}>撤销</button>
+        <button onClick={redo} disabled={!canRedo}>重做</button>
         {/* <h2 style={styles.pageTitle}>Iframe 编辑器</h2>
         <p style={styles.description}>
           通过注入方式将编辑器注入到 iframe 中，实现对 iframe 内部元素的编辑。鼠标悬停高亮，点击选中后可进行编辑。
@@ -68,15 +70,12 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
   editorWrapper: {
     backgroundColor: '#fff',
-    borderRadius: '8px',
-    padding: '24px',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
   },
   iframe: {
     width: '100%',
     height: '660px',
-    border: '1px solid #e0e0e0',
-    borderRadius: '12px',
+    outline: 'none',
+    border:0
   },
   debugPanel: {
     marginTop: '24px',

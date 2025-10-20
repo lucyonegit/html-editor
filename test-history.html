@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HistoryManager 集成测试</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+
+    #test-editor {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 40px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      min-height: 400px;
+    }
+
+    h1 {
+      color: #333;
+      cursor: pointer;
+    }
+
+    p {
+      color: #666;
+      line-height: 1.6;
+      cursor: pointer;
+    }
+
+    div {
+      cursor: pointer;
+      padding: 10px;
+      margin: 10px 0;
+    }
+
+    .selected-element {
+      outline: 2px solid #4CAF50;
+      outline-offset: 2px;
+    }
+
+    .hover-highlight {
+      background-color: rgba(76, 175, 80, 0.1);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    button {
+      cursor: pointer;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      transition: background 0.3s;
+    }
+
+    button:hover:not(:disabled) {
+      background: #45a049;
+    }
+
+    button:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+
+    #status {
+      background: #f9f9f9;
+      padding: 10px;
+      border-radius: 4px;
+    }
+
+    #status > div {
+      margin: 5px 0;
+    }
+
+    #status-text {
+      font-weight: bold;
+      color: #4CAF50;
+    }
+
+    .instructions {
+      max-width: 800px;
+      margin: 20px auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .instructions h2 {
+      margin-top: 0;
+      color: #333;
+    }
+
+    .instructions ul {
+      line-height: 1.8;
+    }
+
+    .instructions code {
+      background: #f4f4f4;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="instructions">
+    <h2>🎯 HistoryManager 集成测试</h2>
+    <p><strong>功能说明：</strong>这个页面演示了 HistoryManager 与编辑器的完整集成效果。</p>
+
+    <h3>📝 使用说明：</h3>
+    <ul>
+      <li>点击页面中的元素（标题、段落、div）进行选择</li>
+      <li>使用右侧控制面板的按钮执行操作：
+        <ul>
+          <li><strong>修改颜色</strong>: 随机改变标题颜色</li>
+          <li><strong>修改字体大小</strong>: 随机改变段落字体大小</li>
+          <li><strong>批量修改</strong>: 一次性修改颜色、字体大小和粗细（合并为1条历史）</li>
+          <li><strong>删除元素</strong>: 删除div元素（可以撤销恢复）</li>
+        </ul>
+      </li>
+      <li>使用快捷键：
+        <ul>
+          <li><code>Ctrl+Z</code> (Mac: <code>Cmd+Z</code>): 撤销</li>
+          <li><code>Ctrl+Shift+Z</code> (Mac: <code>Cmd+Shift+Z</code>): 重做</li>
+          <li><code>Ctrl+Y</code> (Mac: <code>Cmd+Y</code>): 重做（Windows风格）</li>
+        </ul>
+      </li>
+      <li>观察右侧面板的"历史数量"变化</li>
+      <li>打开浏览器控制台查看详细日志</li>
+    </ul>
+
+    <h3>✨ 测试要点：</h3>
+    <ul>
+      <li>✅ 样式修改会自动记录到历史</li>
+      <li>✅ 撤销/重做功能正常工作</li>
+      <li>✅ 连续相同操作会自动合并（1秒内）</li>
+      <li>✅ 批量操作合并为一条历史记录</li>
+      <li>✅ 删除操作可以撤销恢复</li>
+      <li>✅ 快捷键正常工作</li>
+      <li>✅ UI状态实时更新</li>
+    </ul>
+  </div>
+
+  <!-- 编辑器容器会由脚本创建 -->
+  <!-- 控制面板会由脚本创建 -->
+
+  <!-- 加载编译后的测试脚本 -->
+  <script type="module">
+    // 在实际使用时，这里应该加载编译后的 integration-test.js
+    // import './dist/examples/integration-test.js';
+
+    // 临时提示：需要先编译 TypeScript
+    console.log('请先编译 TypeScript 文件：');
+    console.log('npm run build');
+    console.log('然后在 dist 目录中找到编译后的文件');
+  </script>
+
+  <noscript>
+    <p style="text-align: center; color: red;">请启用 JavaScript 以运行此测试</p>
+  </noscript>
+</body>
+</html>

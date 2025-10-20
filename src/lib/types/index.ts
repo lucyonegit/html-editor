@@ -6,3 +6,4 @@ export * from "./core/editor";
 export * from "./core/moveable";
 export * from "./core/style";
 export * from "./core/events";
+export * from "./core/history";

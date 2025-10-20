@@ -5,6 +5,8 @@
 import { EventManager } from '../eventManager'
 import StyleManager from '../styleManager';
 import { MoveableManager } from '../moveableManager';
+import { HistoryManager } from '../historyManager';
+import { createElementAddCommand, createElementDeleteCommand } from '../historyManager/commands';
 import { defaultStyleConfig, generateEditorCSS } from '../../config/styles';
 import type { HTMLEditorOptions, Position, EditorStyleConfig } from '../../types';
 import { createElement, getElementType } from '../utils';
@@ -17,6 +19,7 @@ export class HTMLEditor {
   eventManager: EventManager | null;
   styleManager: StyleManager | null;
   moveableManager: MoveableManager | null;
+  historyManager: HistoryManager | null;
   container: HTMLElement | null;
 
   // 操作状态
@@ -33,10 +36,16 @@ export class HTMLEditor {
       styleConfig: defaultStyleConfig,
       enableContentEditable: true, // 默认启用
       enableMoveable: false, // 默认启用拖拽与缩放
+      enableHistory: true, // 默认启用历史记录
+      historyOptions: {
+        maxHistorySize: 100,
+        mergeInterval: 1000,
+      },
       onElementSelect: null,
       onStyleChange: null,
       onContentChange: null,
       onReady: null,
+      onHistoryChange: null,
       ...options
     };
 
@@ -50,11 +59,20 @@ export class HTMLEditor {
       };
     }
 
+    // 合并历史记录配置
+    if (options.historyOptions) {
+      this.options.historyOptions = {
+        ...this.options.historyOptions,
+        ...options.historyOptions,
+      };
+    }
+
     this.selectedElement = null;
 
     this.eventManager = null;
     this.styleManager = null;
     this.moveableManager = null;
+    this.historyManager = null;
     this.container = null;
   }
 
@@ -114,6 +132,11 @@ export class HTMLEditor {
     this.eventManager = new EventManager(this);
     this.styleManager = new StyleManager(this);
     this.moveableManager = new MoveableManager(this, (this.options as any).moveableOptions ?? {});
+
+    // 初始化历史管理器
+    if (this.options.enableHistory !== false) {
+      this.historyManager = new HistoryManager(this, this.options.historyOptions);
+    }
   }
 
   bindEvents(): void {
@@ -280,7 +303,14 @@ export class HTMLEditor {
   addElement(type: string, content: string = ''): HTMLElement {
     const element = createElement(type, content);
     if (this.container) {
-      this.container.appendChild(element);
+      // 记录添加操作
+      if (this.historyManager) {
+        const command = createElementAddCommand(element, this.container, null);
+        command.execute();
+        this.historyManager.push(command);
+      } else {
+        this.container.appendChild(element);
+      }
     }
     this.selectElement(element);
     this.emit('contentChange');
@@ -290,7 +320,20 @@ export class HTMLEditor {
   deleteElement(element: HTMLElement | null = this.selectedElement): boolean {
     if (!element || element === this.container) return false;
 
-    element.remove();
+    const parent = element.parentElement;
+    const nextSibling = element.nextSibling as HTMLElement | null;
+
+    if (!parent) return false;
+
+    // 记录删除操作
+    if (this.historyManager) {
+      const command = createElementDeleteCommand(element, parent, nextSibling);
+      command.execute();
+      this.historyManager.push(command);
+    } else {
+      element.remove();
+    }
+
     this.clearSelection();
     this.emit('contentChange');
     return true;
@@ -369,12 +412,82 @@ export class HTMLEditor {
     this.isChangingColor = false;
   }
 
+  // ============================================
+  // 历史记录相关 API
+  // ============================================
+
+  /**
+   * 撤销上一个操作
+   */
+  undo(): boolean {
+    return this.historyManager?.undo() ?? false;
+  }
+
+  /**
+   * 重做已撤销的操作
+   */
+  redo(): boolean {
+    return this.historyManager?.redo() ?? false;
+  }
+
+  /**
+   * 检查是否可以撤销
+   */
+  canUndo(): boolean {
+    return this.historyManager?.canUndo() ?? false;
+  }
+
+  /**
+   * 检查是否可以重做
+   */
+  canRedo(): boolean {
+    return this.historyManager?.canRedo() ?? false;
+  }
+
+  /**
+   * 开始批量操作
+   */
+  beginBatch(): void {
+    this.historyManager?.beginBatch();
+  }
+
+  /**
+   * 结束批量操作
+   */
+  endBatch(): void {
+    this.historyManager?.endBatch();
+  }
+
+  /**
+   * 取消批量操作
+   */
+  cancelBatch(): void {
+    this.historyManager?.cancelBatch();
+  }
+
+  /**
+   * 清空历史记录
+   */
+  clearHistory(): void {
+    this.historyManager?.clear();
+  }
+
+  /**
+   * 获取历史状态
+   */
+  getHistoryState() {
+    return this.historyManager?.getState();
+  }
+
   destroy(): void {
     if (this.eventManager) {
       this.eventManager.unbindAll();
     }
     if (this.moveableManager) {
       this.moveableManager.destroy();
+    }
+    if (this.historyManager) {
+      this.historyManager.destroy();
     }
     if (this.container) {
       this.container.classList.remove('html-visual-editor');
