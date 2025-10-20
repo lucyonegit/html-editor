@@ -6,6 +6,8 @@ export interface MoveableOptions {
   keepRatio?: boolean;
   throttleDrag?: number;
   throttleResize?: number;
+  throttleScale?: number;
+  origin?: boolean;
   // 吸附与标尺线相关
   snappable?: boolean;
   snapCenter?: boolean;

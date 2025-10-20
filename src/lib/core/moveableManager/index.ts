@@ -7,8 +7,6 @@ import Moveable from "moveable";
 import { type HTMLEditor } from "../editor";
 import type { MoveableOptions } from "../../types";
 
-
-
 export class MoveableManager {
   private editor: HTMLEditor;
   private instance: Moveable | null = null;
@@ -18,15 +16,17 @@ export class MoveableManager {
   private originalState: {
     contenteditable?: string | null;
     userSelect?: string | null;
+    transformOrigin?: string | null;
   } = {};
 
   constructor(editor: HTMLEditor, options: MoveableOptions = {}) {
     this.editor = editor;
     this.options = {
       renderDirections: ["nw", "ne", "sw", "se"],
-      keepRatio: false,
+      keepRatio: true,
       throttleDrag: 0,
       throttleResize: 0,
+      throttleScale: 0,
 
       // 默认开启吸附与标尺线
       snappable: true,
@@ -80,20 +80,24 @@ export class MoveableManager {
       });
 
     // 可选：基础水平/垂直标尺线（容器边与中心）
-    const hGuides =
-      this.options.horizontalGuidelines ??
-      [0, Math.round(container.clientHeight / 2), container.clientHeight];
-    const vGuides =
-      this.options.verticalGuidelines ??
-      [0, Math.round(container.clientWidth / 2), container.clientWidth];
+    const hGuides = this.options.horizontalGuidelines ?? [
+      0,
+      Math.round(container.clientHeight / 2),
+      container.clientHeight,
+    ];
+    const vGuides = this.options.verticalGuidelines ?? [
+      0,
+      Math.round(container.clientWidth / 2),
+      container.clientWidth,
+    ];
 
     this.instance = new Moveable(root, {
       target: element,
       draggable: true,
-      resizable: true,
+      scalable: true,
       edgeDraggable: true,
       checkInput: true,
-
+      origin:false,
 
       // 缩放手柄
       renderDirections: this.options.renderDirections,
@@ -101,7 +105,7 @@ export class MoveableManager {
 
       // 性能相关
       throttleDrag: this.options.throttleDrag,
-      throttleResize: this.options.throttleResize,
+      throttleScale: this.options.throttleScale,
 
       // 吸附与对齐线
       snappable: this.options.snappable,
@@ -109,7 +113,7 @@ export class MoveableManager {
       elementGuidelines: autoGuidelines,
       horizontalGuidelines: hGuides,
       verticalGuidelines: vGuides,
-      // 提高阈值，避免吸附过强导致“拖不动”的感觉
+      // 提高阈值，避免吸附过强导致"拖不动"的感觉
       snapThreshold: this.options.snapThreshold ?? 10,
       snapGridWidth: this.options.snapGridWidth,
       snapGridHeight: this.options.snapGridHeight,
@@ -139,36 +143,25 @@ export class MoveableManager {
         el.style.removeProperty("user-select");
       }
       this.editor.setDragging(false);
-      // 拖拽结束时触发 contentChange
       this.editor.emit("contentChange");
     });
 
-    // 缩放事件：更新尺寸，并用 drag.transform 同步位置（如有）
-    this.instance.on("resizeStart", () => {
+    // 缩放事件：使用 transform: scale 进行缩放
+    this.instance.on("scaleStart", (e) => {
       this.editor.setResizing(true);
+      e.target.blur();
     });
-    this.instance.on("resize", ({ target, width, height, drag }) => {
-      const el = target as HTMLElement;
-      el.style.width = `${width}px`;
-      el.style.height = `${height}px`;
 
-      if (drag && drag.transform) {
-        el.style.transform = drag.transform;
-        this.editor.emit("styleChange", el, {
-          width: `${width}px`,
-          height: `${height}px`,
-          transform: drag.transform,
-        });
-      } else {
-        this.editor.emit("styleChange", el, {
-          width: `${width}px`,
-          height: `${height}px`,
-        });
-      }
+    this.instance.on("scale", ({ target, transform, drag }) => {
+      const el = target as HTMLElement;
+      el.style.transform = drag.transform;
+      this.editor.emit("styleChange", el, {
+        transform: drag && drag.transform?drag.transform : transform,
+      });
     });
-    this.instance.on("resizeEnd", () => {
+
+    this.instance.on("scaleEnd", () => {
       this.editor.setResizing(false);
-      // 缩放结束时触发 contentChange
       this.editor.emit("contentChange");
     });
   }
@@ -187,14 +180,15 @@ export class MoveableManager {
 
   private prepareElement(element: HTMLElement) {
     // 保存原始状态
-    this.originalState.contenteditable = element.getAttribute("contenteditable");
+    this.originalState.contenteditable =
+      element.getAttribute("contenteditable");
     this.originalState.userSelect = element.style.userSelect || null;
+    this.originalState.transformOrigin = element.style.transformOrigin || null;
 
-    // 禁用 contenteditable 与选择，避免拖拽冲突；禁用触摸默认滚动
     element.setAttribute("contenteditable", "false");
     element.style.userSelect = "none";
     (element.style as any).touchAction = "none";
-    element.style.willChange = "transform";
+    // element.style.willChange = "transform";
   }
 
   private restoreElement(element: HTMLElement) {
@@ -203,7 +197,10 @@ export class MoveableManager {
       if (this.originalState.contenteditable === "") {
         element.removeAttribute("contenteditable");
       } else {
-        element.setAttribute("contenteditable", this.originalState.contenteditable);
+        element.setAttribute(
+          "contenteditable",
+          this.originalState.contenteditable
+        );
       }
     } else {
       // 如果原本没有该属性，移除
@@ -215,6 +212,13 @@ export class MoveableManager {
       element.style.userSelect = this.originalState.userSelect || "";
     } else {
       element.style.removeProperty("user-select");
+    }
+
+    // 恢复 transform-origin
+    if (this.originalState.transformOrigin != null) {
+      element.style.transformOrigin = this.originalState.transformOrigin || "";
+    } else {
+      element.style.removeProperty("transform-origin");
     }
 
     // 清理 will-change
