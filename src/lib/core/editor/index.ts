@@ -339,8 +339,6 @@ export class HTMLEditor {
     return true;
   }
 
-  // 工具函数已抽离到 ./core/utils
-
   // 事件系统
   emit(eventName: string, ...args: any[]): void {
     const callbackName = `on${eventName.charAt(0).toUpperCase() + eventName.slice(1)}` as keyof HTMLEditorOptions;

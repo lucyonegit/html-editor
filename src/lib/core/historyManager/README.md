@@ -166,29 +166,7 @@ function removeElement(element: HTMLElement) {
 removeElement(element);
 ```
 
-### 5. 移动元素
-
-```typescript
-import { createElementMoveCommand } from './lib/core/historyManager/commands';
-
-function moveElement(element: HTMLElement, newParent: HTMLElement) {
-  const oldParent = element.parentElement!;
-  const oldNextSibling = element.nextSibling as HTMLElement | null;
-
-  const command = createElementMoveCommand(
-    element,
-    oldParent,
-    newParent,
-    oldNextSibling,
-    null
-  );
-
-  command.execute();
-  history.push(command);
-}
-```
-
-### 6. 批量操作
+### 5. 批量操作
 
 ```typescript
 // 将多个操作合并为一个历史记录
@@ -402,7 +380,6 @@ interface HistoryManagerOptions {
 - `createContentChangeCommand(element, oldContent, newContent)`
 - `createElementAddCommand(element, parent, nextSibling)`
 - `createElementDeleteCommand(element, parent, nextSibling)`
-- `createElementMoveCommand(element, oldParent, newParent, ...)`
 - `createBatchCommand(commands)`
 
 ## 最佳实践

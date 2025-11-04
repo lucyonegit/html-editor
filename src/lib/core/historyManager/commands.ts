@@ -1,6 +1,6 @@
 /**
  * Command Implementations
- * 各种操作命令的具体实现
+ * 操作命令的具体实现
  */
 
 import {
@@ -10,7 +10,6 @@ import {
   ContentChangeCommand,
   ElementAddCommand,
   ElementDeleteCommand,
-  ElementMoveCommand,
   BatchCommand,
 } from './types';
 
@@ -44,14 +43,12 @@ export function createStyleChangeCommand(
     },
 
     merge(command: Command): boolean {
-      // 只合并相同元素、相同属性的样式变更
       if (
         command.type === OperationType.STYLE_CHANGE &&
         (command as StyleChangeCommand).element === element &&
         (command as StyleChangeCommand).property === property &&
-        Date.now() - command.timestamp < 1000 // 1秒内的操作可以合并
+        Date.now() - command.timestamp < 1000
       ) {
-        // 更新新值，但保留原始旧值
         this.newValue = (command as StyleChangeCommand).newValue;
         this.timestamp = command.timestamp;
         return true;
@@ -85,11 +82,10 @@ export function createContentChangeCommand(
     },
 
     merge(command: Command): boolean {
-      // 连续的内容变更可以合并
       if (
         command.type === OperationType.CONTENT_CHANGE &&
         (command as ContentChangeCommand).element === element &&
-        Date.now() - command.timestamp < 2000 // 2秒内的输入可以合并
+        Date.now() - command.timestamp < 2000
       ) {
         this.newContent = (command as ContentChangeCommand).newContent;
         this.timestamp = command.timestamp;
@@ -150,7 +146,6 @@ export function createElementDeleteCommand(
     },
 
     undo() {
-      // 创建新元素并恢复
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = this.elementHTML;
       const restoredElement = tempDiv.firstChild as HTMLElement;
@@ -161,80 +156,7 @@ export function createElementDeleteCommand(
         parent.appendChild(restoredElement);
       }
 
-      // 更新引用
       this.element = restoredElement;
-    },
-  };
-}
-
-/**
- * 创建元素移动命令
- */
-export function createElementMoveCommand(
-  element: HTMLElement,
-  oldParent: HTMLElement,
-  newParent: HTMLElement,
-  oldNextSibling: HTMLElement | null,
-  newNextSibling: HTMLElement | null,
-  oldPosition?: { x: number; y: number },
-  newPosition?: { x: number; y: number }
-): ElementMoveCommand {
-  return {
-    type: OperationType.ELEMENT_MOVE,
-    timestamp: Date.now(),
-    element,
-    oldParent,
-    newParent,
-    oldNextSibling,
-    newNextSibling,
-    oldPosition,
-    newPosition,
-
-    execute() {
-      // 移动到新位置
-      if (newNextSibling) {
-        newParent.insertBefore(element, newNextSibling);
-      } else {
-        newParent.appendChild(element);
-      }
-
-      // 应用新位置
-      if (newPosition) {
-        element.style.transform = `translate(${newPosition.x}px, ${newPosition.y}px)`;
-      }
-    },
-
-    undo() {
-      // 移回原位置
-      if (oldNextSibling) {
-        oldParent.insertBefore(element, oldNextSibling);
-      } else {
-        oldParent.appendChild(element);
-      }
-
-      // 恢复原位置
-      if (oldPosition) {
-        element.style.transform = `translate(${oldPosition.x}px, ${oldPosition.y}px)`;
-      } else {
-        element.style.removeProperty('transform');
-      }
-    },
-
-    merge(command: Command): boolean {
-      // 连续的移动操作可以合并
-      if (
-        command.type === OperationType.ELEMENT_MOVE &&
-        (command as ElementMoveCommand).element === element &&
-        Date.now() - command.timestamp < 500 // 500毫秒内的移动可以合并
-      ) {
-        const moveCmd = command as ElementMoveCommand;
-        this.newParent = moveCmd.newParent;
-        this.newNextSibling = moveCmd.newNextSibling;
-        this.newPosition = moveCmd.newPosition;
-        this.timestamp = command.timestamp;
-        return true;
-      }
-      return false;
     },
   };
 }
@@ -253,7 +175,6 @@ export function createBatchCommand(commands: Command[]): BatchCommand {
     },
 
     undo() {
-      // 反向执行撤销
       for (let i = commands.length - 1; i >= 0; i--) {
         commands[i].undo();
       }

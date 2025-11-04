@@ -119,17 +119,6 @@ createElementDeleteCommand(
   nextSibling: HTMLElement | null
 ): ElementDeleteCommand
 
-// 元素移动
-createElementMoveCommand(
-  element: HTMLElement,
-  oldParent: HTMLElement,
-  newParent: HTMLElement,
-  oldNextSibling: HTMLElement | null,
-  newNextSibling: HTMLElement | null,
-  oldPosition?: { x: number; y: number },
-  newPosition?: { x: number; y: number }
-): ElementMoveCommand
-
 // 批量命令
 createBatchCommand(commands: Command[]): BatchCommand
 ```

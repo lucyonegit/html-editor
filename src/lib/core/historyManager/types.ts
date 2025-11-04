@@ -7,15 +7,11 @@
  * 操作类型枚举
  */
 export enum OperationType {
-  // 样式操作
   STYLE_CHANGE = 'style_change',
-  // 内容操作
   CONTENT_CHANGE = 'content_change',
-  // 元素操作
   ELEMENT_ADD = 'element_add',
   ELEMENT_DELETE = 'element_delete',
   ELEMENT_MOVE = 'element_move',
-  // 批量操作
   BATCH = 'batch',
 }
 
@@ -27,7 +23,7 @@ export interface Command {
   timestamp: number;
   execute: () => void;
   undo: () => void;
-  merge?: (command: Command) => boolean; // 是否可以与其他命令合并
+  merge?: (command: Command) => boolean;
 }
 
 /**
@@ -69,21 +65,7 @@ export interface ElementDeleteCommand extends Command {
   element: HTMLElement;
   parent: HTMLElement;
   nextSibling: HTMLElement | null;
-  elementHTML: string; // 保存完整HTML以便恢复
-}
-
-/**
- * 元素移动命令
- */
-export interface ElementMoveCommand extends Command {
-  type: OperationType.ELEMENT_MOVE;
-  element: HTMLElement;
-  oldParent: HTMLElement;
-  newParent: HTMLElement;
-  oldNextSibling: HTMLElement | null;
-  newNextSibling: HTMLElement | null;
-  oldPosition?: { x: number; y: number };
-  newPosition?: { x: number; y: number };
+  elementHTML: string;
 }
 
 /**
@@ -98,10 +80,10 @@ export interface BatchCommand extends Command {
  * 历史记录管理器配置
  */
 export interface HistoryManagerOptions {
-  maxHistorySize?: number; // 最大历史记录数量
-  mergeInterval?: number; // 合并操作的时间间隔（毫秒）
-  enableAutoSnapshot?: boolean; // 是否启用自动快照
-  snapshotInterval?: number; // 自动快照间隔（操作次数）
+  maxHistorySize?: number;
+  mergeInterval?: number;
+  enableAutoSnapshot?: boolean;
+  snapshotInterval?: number;
 }
 
 /**

@@ -1,16 +1,18 @@
 /**
  * Moveable Manager
- * 集成 moveable，实现选中元素的拖拽与四角缩放
- * 依赖：npm i moveable
+ * 实现选中元素的拖拽与四角缩放
  */
 import Moveable from "moveable";
 import { type HTMLEditor } from "../editor";
 import type { MoveableOptions } from "../../types";
+import { MoveableEventsHandler } from "./events";
+import { MoveableGuidelinesHandler } from "./guidelines";
 
 export class MoveableManager {
   private editor: HTMLEditor;
   private instance: Moveable | null = null;
   private options: MoveableOptions;
+  private eventsHandler: MoveableEventsHandler;
 
   // 记录启用前的属性，便于恢复
   private originalState: {
@@ -21,6 +23,7 @@ export class MoveableManager {
 
   constructor(editor: HTMLEditor, options: MoveableOptions = {}) {
     this.editor = editor;
+    this.eventsHandler = new MoveableEventsHandler(editor);
     this.options = {
       renderDirections: ["nw", "ne", "sw", "se"],
       keepRatio: true,
@@ -57,39 +60,33 @@ export class MoveableManager {
     // 启用前准备：禁用 contenteditable 与选择，避免拖拽被当作文本选择
     this.prepareElement(element);
 
+    // 获取容器元素
+    const container = MoveableGuidelinesHandler.getContainer(
+      element,
+      this.editor.container,
+      this.options.snapContainer ?? null
+    );
+
+    // 计算自动对齐参考线
+    const autoGuidelines = MoveableGuidelinesHandler.calculateAutoGuidelines(
+      element,
+      container,
+      this.options.elementGuidelines
+    );
+
+    // 计算水平标尺线
+    const hGuides = MoveableGuidelinesHandler.calculateHorizontalGuidelines(
+      container,
+      this.options.horizontalGuidelines
+    );
+
+    // 计算垂直标尺线
+    const vGuides = MoveableGuidelinesHandler.calculateVerticalGuidelines(
+      container,
+      this.options.verticalGuidelines
+    );
+
     const root = element.ownerDocument?.body || document.body;
-
-    // 以编辑器容器为参考（若存在），否则用目标的父节点或文档 body
-    const container =
-      this.options.snapContainer ??
-      (this.editor.container || element.parentElement || root);
-
-    // 自动收集容器内其他元素作为对齐参考线
-    const autoGuidelines =
-      this.options.elementGuidelines ??
-      Array.from(container.querySelectorAll<HTMLElement>("*")).filter((el) => {
-        if (el === element) return false;
-        const rect = el.getBoundingClientRect();
-        const style = window.getComputedStyle(el);
-        const visible =
-          style.display !== "none" &&
-          style.visibility !== "hidden" &&
-          rect.width > 0 &&
-          rect.height > 0;
-        return visible;
-      });
-
-    // 可选：基础水平/垂直标尺线（容器边与中心）
-    const hGuides = this.options.horizontalGuidelines ?? [
-      0,
-      Math.round(container.clientHeight / 2),
-      container.clientHeight,
-    ];
-    const vGuides = this.options.verticalGuidelines ?? [
-      0,
-      Math.round(container.clientWidth / 2),
-      container.clientWidth,
-    ];
 
     this.instance = new Moveable(root, {
       target: element,
@@ -97,7 +94,7 @@ export class MoveableManager {
       scalable: true,
       edgeDraggable: true,
       checkInput: true,
-      origin:false,
+      origin: false,
 
       // 缩放手柄
       renderDirections: this.options.renderDirections,
@@ -120,50 +117,8 @@ export class MoveableManager {
       snapDirections: this.options.snapDirections,
     });
 
-    // 拖拽事件：直接使用 moveable 提供的 transform（包含叠加）
-    this.instance.on("dragStart", ({ target, inputEvent }) => {
-      const el = target as HTMLElement;
-      try {
-        inputEvent?.preventDefault();
-      } catch {}
-      el.style.userSelect = "none";
-      this.editor.setDragging(true);
-    });
-    this.instance.on("drag", ({ target, transform }) => {
-      const el = target as HTMLElement;
-      el.style.transform = transform;
-      this.editor.emit("styleChange", el, { transform });
-    });
-    this.instance.on("dragEnd", ({ target }) => {
-      // 拖拽结束恢复 userSelect（最终完整恢复在 destroy 中进行）
-      const el = target as HTMLElement;
-      if (this.originalState.userSelect != null) {
-        el.style.userSelect = this.originalState.userSelect || "";
-      } else {
-        el.style.removeProperty("user-select");
-      }
-      this.editor.setDragging(false);
-      this.editor.emit("contentChange");
-    });
-
-    // 缩放事件：使用 transform: scale 进行缩放
-    this.instance.on("scaleStart", (e) => {
-      this.editor.setResizing(true);
-      e.target.blur();
-    });
-
-    this.instance.on("scale", ({ target, transform, drag }) => {
-      const el = target as HTMLElement;
-      el.style.transform = drag.transform;
-      this.editor.emit("styleChange", el, {
-        transform: drag && drag.transform?drag.transform : transform,
-      });
-    });
-
-    this.instance.on("scaleEnd", () => {
-      this.editor.setResizing(false);
-      this.editor.emit("contentChange");
-    });
+    // 绑定拖拽和缩放事件
+    this.eventsHandler.bindAllEvents(this.instance);
   }
 
   destroy() {
@@ -188,7 +143,6 @@ export class MoveableManager {
     element.setAttribute("contenteditable", "false");
     element.style.userSelect = "none";
     (element.style as any).touchAction = "none";
-    // element.style.willChange = "transform";
   }
 
   private restoreElement(element: HTMLElement) {
@@ -203,7 +157,6 @@ export class MoveableManager {
         );
       }
     } else {
-      // 如果原本没有该属性，移除
       element.removeAttribute("contenteditable");
     }
 

@@ -43,7 +43,6 @@ history.redo();  // Ctrl+Shift+Z
 | ContentChange | 内容修改 | `createContentChangeCommand()` |
 | ElementAdd | 添加元素 | `createElementAddCommand()` |
 | ElementDelete | 删除元素 | `createElementDeleteCommand()` |
-| ElementMove | 移动元素 | `createElementMoveCommand()` |
 | Batch | 批量操作 | `createBatchCommand()` |
 
 ## 常见用法

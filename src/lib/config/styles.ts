@@ -39,13 +39,14 @@ export const defaultStyleConfig: EditorStyleConfig = {
  */
 export function generateEditorCSS(config: EditorStyleConfig = defaultStyleConfig, enableMoveable: boolean | undefined): string {
   const { hover, selected, badge } = config;
+  const scope = '.html-visual-editor';
 
   let css = `
-    .html-visual-editor {
+    ${scope} {
       position: relative;
     }
 
-    .hover-highlight {
+    ${scope} .hover-highlight {
       outline: ${hover.outline} !important;
       outline-offset: ${hover.outlineOffset};
       position: relative;
@@ -53,32 +54,27 @@ export function generateEditorCSS(config: EditorStyleConfig = defaultStyleConfig
       ${hover.backgroundColor ? `background-color: ${hover.backgroundColor} !important;` : ''}
     }
 
-    .selected-element {
+    ${scope} .selected-element {
       outline: ${enableMoveable ? 'none' : selected.outline} !important;
       outline-offset: ${selected.outlineOffset};
       cursor: ${selected.cursor};
       ${selected.backgroundColor ? `background-color: ${selected.backgroundColor} !important;` : ''}
     }
 
-    /* Contenteditable editing styles - prevent any layout changes */
-    [contenteditable="true"] {
+    ${scope} [contenteditable="true"] {
       user-select: text;
-      /* Critical: prevent box model changes */
-      /* Prevent font/text rendering changes */
       -webkit-font-smoothing: inherit !important;
       -moz-osx-font-smoothing: inherit !important;
       text-rendering: inherit !important;
     }
 
-    [contenteditable="true"]:focus {
+    ${scope} [contenteditable="true"]:focus {
       outline: ${enableMoveable ? 'none' : selected.outline} !important;
       outline-offset: ${selected.outlineOffset};
       cursor: text !important;
-      /* Prevent any layout changes on focus */
     }
 
-    /* Prevent height/width changes on contenteditable focus */
-    [contenteditable="true"]:empty:not(:focus)::before {
+    ${scope} [contenteditable="true"]:empty:not(:focus)::before {
       content: attr(data-placeholder);
       color: #999;
     }
@@ -89,7 +85,7 @@ export function generateEditorCSS(config: EditorStyleConfig = defaultStyleConfig
     const badgePosition = getBadgePositionCSS(badge.position || 'top-left', badge.offset);
 
     css += `
-    .hover-highlight::before {
+    ${scope} .hover-highlight::before {
       content: attr(data-element-type);
       position: absolute;
       ${badgePosition}
