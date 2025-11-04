@@ -29,7 +29,6 @@ export class MoveableEventsHandler {
       
       // 记录初始状态
       originalTransform = el.style.transform || "";
-      console.log("MoveableEventsHandler: dragStart, originalTransform:", originalTransform);
     });
 
     instance.on("drag", ({ target, transform }) => {
@@ -40,23 +39,14 @@ export class MoveableEventsHandler {
 
     instance.on("dragEnd", ({ target }) => {
       const el = target as HTMLElement;
-      console.log("MoveableEventsHandler: dragEnd called");
-      
       // 记录历史
       if (this.editor.historyManager && originalTransform !== null) {
         const newTransform = el.style.transform || "";
-        console.log("MoveableEventsHandler: comparing transforms", {
-          original: originalTransform,
-          new: newTransform
-        });
         
         if (originalTransform !== newTransform) {
-          console.log("MoveableEventsHandler: transforms differ, creating history command");
           const command = createStyleChangeCommand(el, "transform", originalTransform, newTransform);
           command.execute();
           this.editor.historyManager.push(command);
-        } else {
-          console.log("MoveableEventsHandler: transforms are the same, no history command needed");
         }
       }
       
@@ -75,11 +65,9 @@ export class MoveableEventsHandler {
     instance.on("scaleStart", (e) => {
       this.editor.setResizing(true);
       e.target.blur();
-      
       // 记录初始状态
       const el = e.target as HTMLElement;
       originalTransform = el.style.transform || "";
-      console.log("MoveableEventsHandler: scaleStart, originalTransform:", originalTransform);
     });
 
     instance.on("scale", ({ target, transform, drag }) => {
@@ -92,23 +80,14 @@ export class MoveableEventsHandler {
 
     instance.on("scaleEnd", ({ target }) => {
       const el = target as HTMLElement;
-      console.log("MoveableEventsHandler: scaleEnd called");
-      
       // 记录历史
       if (this.editor.historyManager && originalTransform !== null) {
         const newTransform = el.style.transform || "";
-        console.log("MoveableEventsHandler: comparing transforms", {
-          original: originalTransform,
-          new: newTransform
-        });
         
         if (originalTransform !== newTransform) {
-          console.log("MoveableEventsHandler: transforms differ, creating history command");
           const command = createStyleChangeCommand(el, "transform", originalTransform, newTransform);
           command.execute();
           this.editor.historyManager.push(command);
-        } else {
-          console.log("MoveableEventsHandler: transforms are the same, no history command needed");
         }
       }
       

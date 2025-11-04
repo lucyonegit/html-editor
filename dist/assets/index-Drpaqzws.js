@@ -458,7 +458,7 @@ cursor: move;
       color: #999;
     }
   `;if(n.enabled){const a=K_(n.position||"top-left",n.offset);i+=`
-    .hover-highlight::before {
+    .hover-highlight::after {
       content: attr(data-element-type);
       position: absolute;
       ${a}

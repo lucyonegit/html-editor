@@ -1,6 +1,5 @@
 /**
- * History Manager
- * 实现 Undo/Redo 功能
+ * History Manager 历史记录管理
  */
 
 import { Command, HistoryManagerOptions, HistoryState, OperationType, BatchCommand } from './types';
@@ -28,44 +27,27 @@ export class HistoryManager {
    * 记录一个操作
    */
   push(command: Command): void {
-    // 添加调试日志
-    console.log('HistoryManager.push called', {
-      isExecuting: this.isExecuting,
-      undoStackSize: this.undoStack.length,
-      redoStackSize: this.redoStack.length
-    });
-
     if (this.isExecuting) {
-      console.log('HistoryManager.push: isExecuting is true, not recording');
       return;
     }
 
     // 如果在批量操作中，暂存命令
     if (this.batchCommands) {
-      console.log('HistoryManager.push: in batch mode, queuing command');
       this.batchCommands.push(command);
       return;
     }
-
     const lastCommand = this.undoStack[this.undoStack.length - 1];
     if (lastCommand?.merge && lastCommand.merge(command)) {
-      console.log('HistoryManager.push: merged with last command');
       this.notifyStateChange();
       return;
     }
-
     this.undoStack.push(command);
-    console.log('HistoryManager.push: added new command, undoStack size:', this.undoStack.length);
     
     // 清空重做栈
     this.redoStack = [];
-    console.log('HistoryManager.push: cleared redoStack');
-
     if (this.undoStack.length > this.options.maxHistorySize) {
       this.undoStack.shift();
-      console.log('HistoryManager.push: removed oldest command due to size limit');
     }
-
     this.notifyStateChange();
   }
 
@@ -73,31 +55,20 @@ export class HistoryManager {
    * 撤销操作
    */
   undo(): boolean {
-    console.log('HistoryManager.undo called', {
-      canUndo: this.canUndo(),
-      undoStackSize: this.undoStack.length,
-      redoStackSize: this.redoStack.length
-    });
-
     if (!this.canUndo()) return false;
 
     const command = this.undoStack.pop()!;
-    console.log('HistoryManager.undo: popped command from undoStack, remaining:', this.undoStack.length);
-
     this.isExecuting = true;
     try {
       command.undo();
       this.redoStack.push(command);
-      console.log('HistoryManager.undo: pushed command to redoStack, size:', this.redoStack.length);
       this.notifyStateChange();
       return true;
     } catch (error) {
-      console.error('Undo failed:', error);
       this.undoStack.push(command);
       return false;
     } finally {
       this.isExecuting = false;
-      console.log('HistoryManager.undo: set isExecuting to false');
     }
   }
 
@@ -105,31 +76,20 @@ export class HistoryManager {
    * 重做操作
    */
   redo(): boolean {
-    console.log('HistoryManager.redo called', {
-      canRedo: this.canRedo(),
-      undoStackSize: this.undoStack.length,
-      redoStackSize: this.redoStack.length
-    });
-
     if (!this.canRedo()) return false;
 
     const command = this.redoStack.pop()!;
-    console.log('HistoryManager.redo: popped command from redoStack, remaining:', this.redoStack.length);
-
     this.isExecuting = true;
     try {
       command.execute();
       this.undoStack.push(command);
-      console.log('HistoryManager.redo: pushed command to undoStack, size:', this.undoStack.length);
       this.notifyStateChange();
       return true;
     } catch (error) {
-      console.error('Redo failed:', error);
       this.redoStack.push(command);
       return false;
     } finally {
       this.isExecuting = false;
-      console.log('HistoryManager.redo: set isExecuting to false');
     }
   }
 
@@ -138,7 +98,6 @@ export class HistoryManager {
    */
   canUndo(): boolean {
     const result = this.undoStack.length > 0;
-    console.log('HistoryManager.canUndo:', result, 'undoStack size:', this.undoStack.length);
     return result;
   }
 
@@ -147,7 +106,6 @@ export class HistoryManager {
    */
   canRedo(): boolean {
     const result = this.redoStack.length > 0;
-    console.log('HistoryManager.canRedo:', result, 'redoStack size:', this.redoStack.length);
     return result;
   }
 
@@ -155,7 +113,6 @@ export class HistoryManager {
    * 开始批量操作
    */
   beginBatch(): void {
-    console.log('HistoryManager.beginBatch called');
     this.batchCommands = [];
   }
 
@@ -163,11 +120,6 @@ export class HistoryManager {
    * 结束批量操作
    */
   endBatch(): void {
-    console.log('HistoryManager.endBatch called', {
-      hasBatchCommands: !!this.batchCommands,
-      batchCommandsLength: this.batchCommands?.length || 0
-    });
-
     if (!this.batchCommands || this.batchCommands.length === 0) {
       this.batchCommands = null;
       return;
@@ -175,7 +127,6 @@ export class HistoryManager {
 
     // 如果只有一个命令，直接添加
     if (this.batchCommands.length === 1) {
-      console.log('HistoryManager.endBatch: only one command, pushing directly');
       this.push(this.batchCommands[0]);
     } else {
       const timestamp = Date.now();
@@ -196,7 +147,6 @@ export class HistoryManager {
           }
         },
       };
-      console.log('HistoryManager.endBatch: creating batch command with', this.batchCommands.length, 'commands');
       this.batchCommands = null;
       this.push(batchCommand);
     }
@@ -208,7 +158,6 @@ export class HistoryManager {
    * 取消批量操作
    */
   cancelBatch(): void {
-    console.log('HistoryManager.cancelBatch called');
     this.batchCommands = null;
   }
 
@@ -216,7 +165,6 @@ export class HistoryManager {
    * 清空历史记录
    */
   clear(): void {
-    console.log('HistoryManager.clear called');
     this.undoStack = [];
     this.redoStack = [];
     this.notifyStateChange();
@@ -232,7 +180,6 @@ export class HistoryManager {
       historySize: this.undoStack.length,
       currentIndex: this.undoStack.length,
     };
-    console.log('HistoryManager.getState:', state);
     return state;
   }
 
@@ -254,7 +201,6 @@ export class HistoryManager {
    * 通知状态变化
    */
   private notifyStateChange(): void {
-    console.log('HistoryManager.notifyStateChange called');
     this.editor.emit('historyChange', this.getState());
   }
 
@@ -262,7 +208,6 @@ export class HistoryManager {
    * 销毁
    */
   destroy(): void {
-    console.log('HistoryManager.destroy called');
     this.clear();
   }
 }
