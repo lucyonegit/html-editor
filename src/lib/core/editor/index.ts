@@ -10,6 +10,7 @@ import { createElementAddCommand, createElementDeleteCommand } from '../historyM
 import { defaultStyleConfig, generateEditorCSS } from '../../config/styles';
 import type { HTMLEditorOptions, Position, EditorStyleConfig } from '../../types';
 import { createElement, getElementType } from '../utils';
+import EditorRegistry from '../editorRegistry';
 
 
 export class HTMLEditor {
@@ -21,6 +22,7 @@ export class HTMLEditor {
   moveableManager: MoveableManager | null;
   historyManager: HistoryManager | null;
   container: HTMLElement | null;
+  EditorRegistry: typeof EditorRegistry;
 
   // 操作状态
   isDragging: boolean = false;
@@ -74,6 +76,7 @@ export class HTMLEditor {
     this.moveableManager = null;
     this.historyManager = null;
     this.container = null;
+    this.EditorRegistry = EditorRegistry;
   }
 
   init(container?: HTMLElement | string): void {
@@ -83,6 +86,8 @@ export class HTMLEditor {
 
     this.validateOptions();
     this.setupContainer();
+    // 注册到全局编辑器注册表
+    this.EditorRegistry.register(this);
     this.initializeManagers();
     this.bindEvents();
     this.emit('ready');
@@ -491,5 +496,7 @@ export class HTMLEditor {
       this.container.classList.remove('html-visual-editor');
     }
     this.container = null;
+    // 从注册表中移除
+    this.EditorRegistry.unregister(this);
   }
 }

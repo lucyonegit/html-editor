@@ -105,6 +105,9 @@ export class EventManager {
         return;
       }
 
+      // 当点击当前容器时，清空其他编辑器的选中样式
+      this.editor.EditorRegistry.clearOthers(this.editor);
+
       // 如果点击的元素已经被选中且可编辑，不要stopPropagation，让contenteditable正常工作
       if (target === this.editor.selectedElement && target.getAttribute('contenteditable') === 'true') {
         // 不阻止事件，让用户可以在元素内部点击定位光标
