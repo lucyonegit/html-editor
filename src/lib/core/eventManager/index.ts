@@ -58,17 +58,10 @@ export class EventManager {
 
       const position = this.editor.getBoundPostion(target);
 
-      if (this.editor.options.helperBox && this.editor.helperBox && this.editor.container) {
-        
-        this.editor.helperBox.style.display = this.editor.selectedElement === target ? 'none' : 'block';
-        this.editor.helperBox.style.width = `${position.width}px`;
-        this.editor.helperBox.style.height = `${position.height}px`;
-        this.editor.helperBox.style.top = `${position.top}px`;
-        this.editor.helperBox.style.left = `${position.left}px`;
+      if (this.editor.options.helperBox && this.editor.helperBoxManager && this.editor.container) {
+        this.editor.helperBoxManager.updatePostion(position);
+        this.editor.helperBoxManager.visible(!(this.editor.selectedElement === target));
       }
-
-      
-
       this.editor.emit('hover', target, position);
     };
 
@@ -80,8 +73,8 @@ export class EventManager {
       }
 
       // 如果启用了 helperBox，则隐藏
-      if (this.editor.options.helperBox && this.editor.helperBox) {
-        this.editor.helperBox.style.display = 'none';
+      if (this.editor.options.helperBox && this.editor.helperBoxManager) {
+        this.editor.helperBoxManager.visible(false);
       }
     };
 

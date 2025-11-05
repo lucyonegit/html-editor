@@ -93,7 +93,7 @@ export function useIframeMode(
     }
     const editor = new HTMLEditor({
       ...options,
-      helperBox: false, // 启用 helperBox
+      helperBox: true, // 启用 helperBox
       enableMoveable: true,
       onElementSelect: (element: HTMLElement | null, pos?: Position) => {
         setSelectedElement(element);

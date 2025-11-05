@@ -11,6 +11,7 @@ import { defaultStyleConfig, generateEditorCSS } from '../../config/styles';
 import type { HTMLEditorOptions, Position, EditorStyleConfig } from '../../types';
 import { createElement, getElementType } from '../utils';
 import EditorRegistry from '../editorRegistry';
+import { HelperBoxManager } from '../helperBoxManager';
 
 
 export class HTMLEditor {
@@ -21,6 +22,7 @@ export class HTMLEditor {
   styleManager: StyleManager | null;
   moveableManager: MoveableManager | null;
   historyManager: HistoryManager | null;
+  helperBoxManager: HelperBoxManager | null;
   container: HTMLElement | null;
   EditorRegistry: typeof EditorRegistry;
 
@@ -29,7 +31,6 @@ export class HTMLEditor {
   isResizing: boolean = false;
   isChangingBackground: boolean = false;
   isChangingColor: boolean = false;
-  helperBox: HTMLElement | null;
   isIframe: boolean;
 
   constructor(options: HTMLEditorOptions = {}) {
@@ -77,10 +78,10 @@ export class HTMLEditor {
     this.eventManager = null;
     this.styleManager = null;
     this.moveableManager = null;
+    this.helperBoxManager = null;
     this.historyManager = null;
     this.container = null;
     this.EditorRegistry = EditorRegistry;
-    this.helperBox = null;
     this.isIframe = false;
   }
 
@@ -94,6 +95,9 @@ export class HTMLEditor {
     this.EditorRegistry.register(this);
     this.initializeManagers();
     this.bindEvents();
+    if (this.options.helperBox) {
+      this.helperBoxManager?.init();
+    }
     this.emit('ready');
   }
 
@@ -113,10 +117,6 @@ export class HTMLEditor {
 
     // 注入编辑器样式
     this.injectStyles();
-
-    if (this.options.helperBox) {
-      this.createHelperBox();
-    }
   }
 
   /**
@@ -147,35 +147,11 @@ export class HTMLEditor {
     doc.head.appendChild(styleElement);
   }
 
-  createHelperBox(): void {
-    if (!this.container) return;
-
-    const doc = this.container.ownerDocument;
-    const isIframe = this.container.ownerDocument !== document;
-
-    const helperBox = doc.getElementById('html-editor-helper-box') || doc.createElement('div');
-    this.helperBox = helperBox;
-    
-    this.helperBox.id = 'html-editor-helper-box';
-    this.helperBox.style.position = 'absolute';
-    this.helperBox.style.zIndex = '9999';
-    this.helperBox.style.display = 'none';
-    this.helperBox.style.pointerEvents = 'none';
-    this.helperBox.style.border = '1px dashed #228be6';
-    this.helperBox.style.backgroundColor = 'rgba(34, 139, 230, 0.04)';
-
-    if(isIframe) {
-      doc.body.appendChild(this.helperBox);
-    } else {
-      this.container.style.position = 'relative';
-      this.container.appendChild(this.helperBox);
-    }
-  }
-
   initializeManagers(): void {
     this.eventManager = new EventManager(this);
     this.styleManager = new StyleManager(this);
     this.moveableManager = new MoveableManager(this, (this.options as any).moveableOptions ?? {});
+    this.helperBoxManager = new HelperBoxManager(this);
 
     // 初始化历史管理器
     if (this.options.enableHistory !== false) {
@@ -216,12 +192,9 @@ export class HTMLEditor {
     this.emit('elementSelect', element, position);
     
     // 如果启用了 helperBox，则更新其位置
-    if (this.options.helperBox && this.helperBox) {
-      this.helperBox.style.display =  !this.options.enableMoveable ? 'block' : 'none';
-      this.helperBox.style.width = `${position.width}px`;
-      this.helperBox.style.height = `${position.height}px`;
-      this.helperBox.style.top = `${position.top}px`;
-      this.helperBox.style.left = `${position.left}px`;
+    if (this.options.helperBox && this.helperBoxManager) {
+      this.helperBoxManager.updatePostion(position);
+      this.helperBoxManager.visible(false);
     }
   }
 
@@ -342,8 +315,8 @@ export class HTMLEditor {
       }
     }
     // 如果启用了 helperBox，则隐藏
-    if (this.options.helperBox && this.helperBox) {
-      this.helperBox.style.display = 'none';
+    if (this.options.helperBox && this.helperBoxManager) {
+      this.helperBoxManager.visible(false);
     }
   }
 
