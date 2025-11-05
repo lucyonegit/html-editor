@@ -37,7 +37,7 @@ export const defaultStyleConfig: EditorStyleConfig = {
  * Generate CSS from style configuration
  * 从样式配置生成CSS
  */
-export function generateEditorCSS(config: EditorStyleConfig = defaultStyleConfig, enableMoveable: boolean | undefined): string {
+export function generateEditorCSS(config: EditorStyleConfig = defaultStyleConfig, enableMoveable: boolean | undefined, helperBox: boolean | undefined): string {
   const { hover, selected, badge } = config;
   const scope = '.html-visual-editor';
 
@@ -47,7 +47,7 @@ export function generateEditorCSS(config: EditorStyleConfig = defaultStyleConfig
     }
 
     ${scope} .hover-highlight {
-      outline: ${hover.outline} !important;
+      outline: ${helperBox ? 'none' : hover.outline} !important;
       outline-offset: ${hover.outlineOffset};
       position: relative;
       cursor: ${hover.cursor};
@@ -55,9 +55,10 @@ export function generateEditorCSS(config: EditorStyleConfig = defaultStyleConfig
     }
 
     ${scope} .selected-element {
-      outline: ${enableMoveable ? 'none' : selected.outline} !important;
+      outline: ${enableMoveable || helperBox ? 'none' : selected.outline} !important;
       outline-offset: ${selected.outlineOffset};
       cursor: ${selected.cursor};
+      position: relative;
       ${selected.backgroundColor ? `background-color: ${selected.backgroundColor} !important;` : ''}
     }
 
@@ -69,7 +70,7 @@ export function generateEditorCSS(config: EditorStyleConfig = defaultStyleConfig
     }
 
     ${scope} [contenteditable="true"]:focus {
-      outline: ${enableMoveable ? 'none' : selected.outline} !important;
+      outline: ${enableMoveable || helperBox ? 'none' : selected.outline} !important;
       outline-offset: ${selected.outlineOffset};
       cursor: text !important;
     }
@@ -86,6 +87,20 @@ export function generateEditorCSS(config: EditorStyleConfig = defaultStyleConfig
 
     css += `
     ${scope} .hover-highlight::before {
+      content: attr(data-element-type);
+      position: absolute;
+      ${badgePosition}
+      background: ${badge.background};
+      color: ${badge.color};
+      padding: ${badge.padding};
+      border-radius: ${badge.borderRadius};
+      font-size: ${badge.fontSize};
+      font-family: ${badge.fontFamily};
+      white-space: nowrap;
+      z-index: ${badge.zIndex};
+    }
+    
+    ${scope} .selected-element::before {
       content: attr(data-element-type);
       position: absolute;
       ${badgePosition}

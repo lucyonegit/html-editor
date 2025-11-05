@@ -4,7 +4,6 @@
  */
 
 import { type HTMLEditor } from '../editor';
-import type { Position } from '../../types';
 import { getElementType } from '../utils';
 
 type EventHandler = (e: Event) => void;
@@ -12,32 +11,21 @@ type EventHandler = (e: Event) => void;
 export class EventManager {
   private editor: HTMLEditor;
   private boundHandlers: Map<string, EventHandler>;
-  private isIframe: boolean;
 
 
   constructor(editor: HTMLEditor) {
     this.editor = editor;
     this.boundHandlers = new Map<string, EventHandler>();
-    this.isIframe = false;
 
   }
 
   bindAll(): void {
-    // 检测container是否是iframe
-    this.detectIframe();
-
     this.bindHoverEvents();
     this.bindClickEvents();
     this.bindDocumentEvents();
   }
 
-  detectIframe(): void {
-    // 检查container是否在iframe中
-    if (this.editor.container && this.editor.container.ownerDocument !== document) {
-      this.isIframe = true;
 
-    }
-  }
 
   bindHoverEvents(): void {
     const handleMouseOver = (e: Event) => {
@@ -65,16 +53,18 @@ export class EventManager {
       target.classList.add('hover-highlight');
       target.setAttribute('data-element-type', getElementType(target));
 
-      // 触发hover事件，包含位置信息
-      const rect = target.getBoundingClientRect();
-      const position: Position = {
-        top: rect.top + (this.isIframe ? 0 : window.scrollY),
-        left: rect.left + (this.isIframe ? 0 : window.scrollX),
-        width: rect.width,
-        height: rect.height,
-        bottom: rect.bottom + (this.isIframe ? 0 : window.scrollY),
-        right: rect.right + (this.isIframe ? 0 : window.scrollX)
-      };
+      const position = this.editor.getBoundPostion(target);
+
+      if (this.editor.options.helperBox && this.editor.helperBox && this.editor.container) {
+        
+        this.editor.helperBox.style.display = this.editor.selectedElement === target ? 'none' : 'block';
+        this.editor.helperBox.style.width = `${position.width}px`;
+        this.editor.helperBox.style.height = `${position.height}px`;
+        this.editor.helperBox.style.top = `${position.top}px`;
+        this.editor.helperBox.style.left = `${position.left}px`;
+      }
+
+      
 
       this.editor.emit('hover', target, position);
     };
@@ -84,6 +74,11 @@ export class EventManager {
       if (!target.classList.contains('selected-element')) {
         target.classList.remove('hover-highlight');
         target.removeAttribute('data-element-type');
+      }
+
+      // 如果启用了 helperBox，则隐藏
+      if (this.editor.options.helperBox && this.editor.helperBox) {
+        this.editor.helperBox.style.display = 'none';
       }
     };
 

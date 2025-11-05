@@ -29,6 +29,8 @@ export class HTMLEditor {
   isResizing: boolean = false;
   isChangingBackground: boolean = false;
   isChangingColor: boolean = false;
+  helperBox: HTMLElement | null;
+  isIframe: boolean;
 
   constructor(options: HTMLEditorOptions = {}) {
     this.options = {
@@ -77,6 +79,8 @@ export class HTMLEditor {
     this.historyManager = null;
     this.container = null;
     this.EditorRegistry = EditorRegistry;
+    this.helperBox = null;
+    this.isIframe = false;
   }
 
   init(container?: HTMLElement | string): void {
@@ -84,19 +88,12 @@ export class HTMLEditor {
       this.options.container = container;
     }
 
-    this.validateOptions();
     this.setupContainer();
     // 注册到全局编辑器注册表
     this.EditorRegistry.register(this);
     this.initializeManagers();
     this.bindEvents();
     this.emit('ready');
-  }
-
-  validateOptions(): void {
-    if (!this.options.container) {
-      throw new Error('Container is required');
-    }
   }
 
   setupContainer(): void {
@@ -107,12 +104,28 @@ export class HTMLEditor {
     if (!container) {
       throw new Error('Container not found');
     }
+    // 检测container是否是iframe
+    this.detectIframe();
 
     this.container = container;
     this.container.classList.add('html-visual-editor');
 
     // 注入编辑器样式
     this.injectStyles();
+
+    if (this.options.helperBox) {
+      this.createHelperBox();
+    }
+  }
+
+  /**
+   * 检查container是否是iframe中
+   */
+  detectIframe(): void {
+    // 检查container是否在iframe中
+    if (this.container && this.container.ownerDocument !== document) {
+      this.isIframe = true;
+    }
   }
 
   /**
@@ -129,8 +142,33 @@ export class HTMLEditor {
 
     const styleElement = doc.createElement('style');
     styleElement.id = styleId;
-    styleElement.textContent = generateEditorCSS(this.options.styleConfig as EditorStyleConfig, this.options.enableMoveable);
+    styleElement.textContent = generateEditorCSS(this.options.styleConfig as EditorStyleConfig, this.options.enableMoveable, this.options.helperBox);
     doc.head.appendChild(styleElement);
+  }
+
+  createHelperBox(): void {
+    if (!this.container) return;
+
+    const doc = this.container.ownerDocument;
+    const isIframe = this.container.ownerDocument !== document;
+
+    const helperBox = doc.getElementById('html-editor-helper-box') || doc.createElement('div');
+    this.helperBox = helperBox;
+    
+    this.helperBox.id = 'html-editor-helper-box';
+    this.helperBox.style.position = 'absolute';
+    this.helperBox.style.zIndex = '9999';
+    this.helperBox.style.display = 'none';
+    this.helperBox.style.pointerEvents = 'none';
+    this.helperBox.style.border = '1px dashed #228be6';
+    this.helperBox.style.backgroundColor = 'rgba(34, 139, 230, 0.04)';
+
+    if(isIframe) {
+      doc.body.appendChild(this.helperBox);
+    } else {
+      this.container.style.position = 'relative';
+      this.container.appendChild(this.helperBox);
+    }
   }
 
   initializeManagers(): void {
@@ -170,21 +208,37 @@ export class HTMLEditor {
       this.enableElementEditing(element);
     }
 
-    // 获取元素位置信息
-    const rect = element.getBoundingClientRect();
-    const position: Position = {
-      top: rect.top + window.scrollY,
-      left: rect.left + window.scrollX,
-      width: rect.width,
-      height: rect.height,
-      bottom: rect.bottom + window.scrollY,
-      right: rect.right + window.scrollX
-    };
-
-    this.emit('elementSelect', element, position);
-    this.selectedElement = element;
     element.classList.add('selected-element');
     element.setAttribute('data-element-type', getElementType(element));
+    this.selectedElement = element;
+    const position = this.getBoundPostion(element);
+    this.emit('elementSelect', element, position);
+    
+    // 如果启用了 helperBox，则更新其位置
+    if (this.options.helperBox && this.helperBox) {
+      this.helperBox.style.display =  !this.options.enableMoveable ? 'block' : 'none';
+      this.helperBox.style.width = `${position.width}px`;
+      this.helperBox.style.height = `${position.height}px`;
+      this.helperBox.style.top = `${position.top}px`;
+      this.helperBox.style.left = `${position.left}px`;
+    }
+  }
+
+  /**
+   * 获取元素的边界相对位置
+   */
+  getBoundPostion(target: HTMLElement) {
+    const rect = target.getBoundingClientRect();
+    const containerRect = this.container!.getBoundingClientRect();
+    const position: Position = {
+      top: this.isIframe ?  rect.top  : rect.top - containerRect.top,
+      left: this.isIframe  ? rect.left : rect.left - containerRect.left,
+      width: rect.width,
+      height: rect.height,
+      bottom: this.isIframe ? rect.bottom : rect.bottom - containerRect.top,
+      right: this.isIframe ? rect.right : rect.right - containerRect.left
+    };
+    return position
   }
 
   /**
@@ -256,25 +310,23 @@ export class HTMLEditor {
     if (this.selectedElement) {
       this.selectedElement.classList.remove('selected-element');
       this.selectedElement.removeAttribute('data-element-type');
-
-      // 销毁 moveable
-      if (this.moveableManager) {
-        this.moveableManager.destroy();
-      }
-
       // 禁用编辑功能
       if (this.options.enableContentEditable) {
         this.disableElementEditing(this.selectedElement);
       }
+       // 销毁 moveable
+      if (this.moveableManager) {
+        this.moveableManager.destroy();
+      }
+      this.selectedElement = null;
+      this.emit('elementSelect', null);
     }
-
     // 清除主文档中的hover样式
     document.querySelectorAll('.hover-highlight').forEach(el => {
       el.classList.remove('hover-highlight');
       el.removeAttribute('data-element-type');
     });
-
-    // 如果在iframe中，也清除iframe文档中的样式
+     // 如果在iframe中，也清除iframe文档中的样式
     if (this.container) {
       const ownerDoc = this.container.ownerDocument;
       if (ownerDoc !== document) {
@@ -288,9 +340,10 @@ export class HTMLEditor {
         });
       }
     }
-
-    this.selectedElement = null;
-    this.emit('elementSelect', null);
+    // 如果启用了 helperBox，则隐藏
+    if (this.options.helperBox && this.helperBox) {
+      this.helperBox.style.display = 'none';
+    }
   }
 
   // 样式应用

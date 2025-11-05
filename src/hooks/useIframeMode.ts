@@ -92,9 +92,12 @@ export function useIframeMode(
       editorRef.current.destroy();
     }
     const editor = new HTMLEditor({
-      styleConfig: options?.styleConfig,
+      ...options,
+      helperBox: false, // 启用 helperBox
+      enableMoveable: true,
       onElementSelect: (element: HTMLElement | null, pos?: Position) => {
         setSelectedElement(element);
+        setPosition(pos || null);
 
         if (element && iframeRef.current && pos) {
           const iframeRect = iframeRef.current.getBoundingClientRect();
@@ -141,7 +144,6 @@ export function useIframeMode(
         options?.onHistoryChange?.(state);
         console.log('历史变化', state);
       },
-      enableMoveable: true,
       enableHistory: true,
       historyOptions: {
         maxHistorySize: 100,

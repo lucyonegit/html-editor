@@ -32,4 +32,5 @@ export interface HTMLEditorOptions {
   onHistoryChange?: OnHistoryChange | null;
   // Moveable 配置透传
   moveableOptions?: MoveableOptions;
+  helperBox?: boolean;
 }
