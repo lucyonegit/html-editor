@@ -33,4 +33,6 @@ export interface HTMLEditorOptions {
   // Moveable 配置透传
   moveableOptions?: MoveableOptions;
   helperBox?: boolean;
+  // 忽略选择的标签
+  ignoreSelectTags?: string[];
 }

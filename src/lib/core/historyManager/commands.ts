@@ -22,9 +22,10 @@ export function createStyleChangeCommand(
   oldValue: string,
   newValue: string
 ): StyleChangeCommand {
+  const time = Date.now();
   return {
     type: OperationType.STYLE_CHANGE,
-    timestamp: Date.now(),
+    timestamp: time,
     element,
     property,
     oldValue,
@@ -47,7 +48,7 @@ export function createStyleChangeCommand(
         command.type === OperationType.STYLE_CHANGE &&
         (command as StyleChangeCommand).element === element &&
         (command as StyleChangeCommand).property === property &&
-        Date.now() - command.timestamp < 1000
+        command.timestamp - time < 1000
       ) {
         this.newValue = (command as StyleChangeCommand).newValue;
         this.timestamp = command.timestamp;

@@ -18,7 +18,7 @@ export class StyleManager {
    * 应用样式并记录历史
    */
   private applyStyleWithHistory(element: HTMLElement, property: string, value: string): void {
-    const oldValue = element.style.getPropertyValue(property);
+    const oldValue = element.style.getPropertyValue(property) || window.getComputedStyle(element).getPropertyValue(property);
 
     // 创建命令并执行
     if (this.editor.historyManager) {
@@ -105,10 +105,9 @@ export class StyleManager {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
     // 使用批量操作记录 background 和 backgroundColor
-    this.editor.beginBatch();
+    // this.editor.beginBatch();
     this.applyStyleWithHistory(element, 'background-color', backgroundColor);
-    this.applyStyleWithHistory(element, 'background', backgroundColor);
-    this.editor.endBatch();
+    // this.editor.endBatch();
     this.editor.emit('styleChange', element, { backgroundColor, background: backgroundColor });
     if (triggerContentChange) {
       this.editor.emit('contentChange');

@@ -18,6 +18,10 @@ export const EditorRegistry = {
   },
   getAll() {
     return Array.from(editors);
+  },
+
+  hasActiveEditor() {
+    return Array.from(editors).some(ed => ed.selectedElement);
   }
 };
 

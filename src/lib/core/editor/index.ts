@@ -50,6 +50,7 @@ export class HTMLEditor {
       onContentChange: null,
       onReady: null,
       onHistoryChange: null,
+      ignoreSelectTags: ['body', 'html','i'],
       ...options
     };
 
