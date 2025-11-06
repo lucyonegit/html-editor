@@ -19,13 +19,22 @@ export function isTextElement(element: HTMLElement): boolean {
   return textTags.includes(element.tagName.toLowerCase());
 }
 
+export function isDivWithImage(element: HTMLElement): boolean {
+  const computedStyle = window.getComputedStyle(element);
+  const {backgroundImage, background} = computedStyle
+  const elementWithBgImage = !!backgroundImage && backgroundImage !== 'none'
+  const elementBgWithUrl = !!background && background.includes('url(')
+  const divWithbg = element.tagName.toLowerCase() === 'div' && element.children.length === 0 && (elementWithBgImage || elementBgWithUrl);
+  return divWithbg
+}
+
 export function isBlockElement(element: HTMLElement): boolean {
   const blockTags = ['div', 'section', 'article', 'header', 'footer', 'main', 'body'];
-  return blockTags.includes(element.tagName.toLowerCase());
+  return blockTags.includes(element.tagName.toLowerCase()) && !isDivWithImage(element);
 }
 
 export function isImageElement(element: HTMLElement): boolean {
-  return element.tagName.toLowerCase() === 'img';
+  return isDivWithImage(element) || element.tagName.toLowerCase() === 'img';
 }
 
 export function createElement(type: string, content: string = ''): HTMLElement {

@@ -10,6 +10,7 @@ import {
   useTextAlign,
 } from '../hooks/useElementStyles';
 import { styles } from '../styles';
+import { TextTypeDropdown } from './TextTypeDropdown';
 
 interface TextToolbarProps {
   editor: HTMLEditor;
@@ -60,6 +61,10 @@ export const TextToolbar: React.FC<TextToolbarProps> = ({ editor, element, onDel
 
   return (
     <div style={styles.toolbar}>
+      <div style={styles.section}>
+        <TextTypeDropdown editor={editor} element={element} />
+      </div>
+      <div style={styles.divider} />
       <div style={styles.section}>
         <div style={styles.buttonGroup}>
           <button

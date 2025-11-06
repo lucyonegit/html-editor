@@ -42,7 +42,7 @@ export function useDirectMode(
             right: pos.right + rect.left
           });
       },
-      onStyleChange: (element: HTMLElement) => {
+      onStyleChange: () => {
         // if (element) {
         //   const rect = element.getBoundingClientRect();
         //   setPosition({

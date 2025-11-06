@@ -12,6 +12,7 @@ export enum OperationType {
   ELEMENT_ADD = 'element_add',
   ELEMENT_DELETE = 'element_delete',
   ELEMENT_MOVE = 'element_move',
+  ELEMENT_TAG_CHANGE = 'element_tag_change',
   BATCH = 'batch',
 }
 
@@ -64,8 +65,15 @@ export interface ElementDeleteCommand extends Command {
   type: OperationType.ELEMENT_DELETE;
   element: HTMLElement;
   parent: HTMLElement;
-  nextSibling: HTMLElement | null;
-  elementHTML: string;
+  nextSibling: Node | null;
+}
+
+export interface ElementTagChangeCommand extends Command {
+  type: OperationType.ELEMENT_TAG_CHANGE;
+  element: HTMLElement;
+  oldTag: string;
+  newTag: string;
+  newElement?: HTMLElement;
 }
 
 /**

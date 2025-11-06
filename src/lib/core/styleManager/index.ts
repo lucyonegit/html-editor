@@ -5,7 +5,7 @@
 
 import { type HTMLEditor } from '../editor';
 import type { ElementStyles } from '../../types';
-import { createStyleChangeCommand } from '../historyManager/commands';
+import { createStyleChangeCommand, createElementTagChangeCommand } from '../historyManager/commands';
 
 export class StyleManager {
   private editor: HTMLEditor;
@@ -189,6 +189,44 @@ export class StyleManager {
       margin: computedStyle.margin,
       borderRadius: computedStyle.borderRadius
     };
+  }
+
+  changeElementTag(element: HTMLElement, newTag: string): HTMLElement | null {
+    if (!element || !element.parentNode || !newTag) {
+      return null;
+    }
+
+    const command = createElementTagChangeCommand(element, newTag);
+    command.execute();
+
+    const newElement = (command as any).newElement as HTMLElement;
+    if (!newElement) return null;
+
+    if (this.editor.historyManager) {
+      this.editor.historyManager.push(command);
+    }
+
+    // Reselect the new element
+    this.editor.selectElement(newElement);
+
+    // Apply default styles for headings
+    // const headingLevels: { [key: string]: string } = {
+    //   H1: '28px',
+    //   H2: '26px',
+    //   H3: '24px',
+    //   H4: '22px',
+    //   H5: '20px',
+    //   H6: '18px',
+    // };
+
+    // const upperCaseNewTag = newTag.toUpperCase();
+    // if (headingLevels[upperCaseNewTag]) {
+    //   this.applyStyleWithHistory(newElement, 'font-size', headingLevels[upperCaseNewTag]);
+    // }
+
+    this.editor.emit('contentChange');
+
+    return newElement;
   }
 
   rgbToHex(rgb: string): string {

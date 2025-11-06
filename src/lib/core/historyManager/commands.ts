@@ -10,11 +10,73 @@ import {
   ContentChangeCommand,
   ElementAddCommand,
   ElementDeleteCommand,
+  ElementTagChangeCommand,
   BatchCommand,
 } from './types';
 
 /**
- * 创建样式变更命令
+ * 创建元素标签变更命令
+ */
+export function createElementTagChangeCommand(
+  element: HTMLElement,
+  newTag: string
+): ElementTagChangeCommand {
+  const oldTag = element.tagName;
+  const newElement = document.createElement(newTag);
+
+  // Copy attributes
+  for (const attr of Array.from(element.attributes)) {
+    newElement.setAttribute(attr.name, attr.value);
+  }
+
+  const headingLevels: { [key: string]: string } = {
+    H1: '28px',
+    H2: '26px',
+    H3: '24px',
+    H4: '22px',
+    H5: '20px',
+    H6: '18px',
+  };
+  const upperCaseNewTag = newTag.toUpperCase();
+  if (headingLevels[upperCaseNewTag]) {
+    newElement.style.fontSize = headingLevels[upperCaseNewTag];
+  } else {
+    newElement.style.fontSize = '14px';
+  }
+
+  // Copy content
+  newElement.innerHTML = element.innerHTML;
+
+  return {
+    type: OperationType.ELEMENT_TAG_CHANGE,
+    timestamp: Date.now(),
+    element,
+    oldTag,
+    newTag,
+    newElement,
+
+    execute() {
+      if (element.parentNode) {
+        element.parentNode.replaceChild(newElement, element);
+        this.element = newElement;
+      }
+    },
+
+    undo() {
+      if (newElement.parentNode) {
+        newElement.parentNode.replaceChild(element, newElement);
+        this.element = element;
+      }
+    },
+
+    merge(): boolean {
+      return false;
+    },
+  };
+}
+
+/**
+ * 创建批量操作命令
  */
 export function createStyleChangeCommand(
   element: HTMLElement,
@@ -132,7 +194,7 @@ export function createElementAddCommand(
 export function createElementDeleteCommand(
   element: HTMLElement,
   parent: HTMLElement,
-  nextSibling: HTMLElement | null
+  nextSibling: Node | null
 ): ElementDeleteCommand {
   return {
     type: OperationType.ELEMENT_DELETE,
@@ -140,24 +202,18 @@ export function createElementDeleteCommand(
     element,
     parent,
     nextSibling,
-    elementHTML: element.outerHTML,
 
     execute() {
-      parent.removeChild(element);
+      if (element.parentNode) {
+        parent.removeChild(element);
+      }
     },
 
     undo() {
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = this.elementHTML;
-      const restoredElement = tempDiv.firstChild as HTMLElement;
-
-      if (nextSibling) {
-        parent.insertBefore(restoredElement, nextSibling);
-      } else {
-        parent.appendChild(restoredElement);
+      // 插回原节点对象
+      if (!element.parentNode) {
+        parent.insertBefore(element, nextSibling);
       }
-
-      this.element = restoredElement;
     },
   };
 }
