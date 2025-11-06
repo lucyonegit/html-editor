@@ -293,3 +293,32 @@ export const useTextDecoration = (element: HTMLElement | null) => {
 
   return isUnderline;
 };
+
+export const useTextAlign = (element: HTMLElement | null) => {
+  const [textAlign, setTextAlign] = useState('left');
+
+  useEffect(() => {
+    if (!element) return;
+
+    const updateTextAlign = () => {
+      const computedStyle = window.getComputedStyle(element);
+      const align = computedStyle.textAlign;
+      setTextAlign(align);
+    };
+
+    updateTextAlign();
+
+    const observer = new MutationObserver(() => {
+      updateTextAlign();
+    });
+
+    observer.observe(element, {
+      attributes: true,
+      attributeFilter: ['style'],
+    });
+
+    return () => observer.disconnect();
+  }, [element]);
+
+  return textAlign;
+};

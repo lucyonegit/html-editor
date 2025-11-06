@@ -7,6 +7,7 @@ import {
   useFontWeight,
   useFontStyle,
   useTextDecoration,
+  useTextAlign,
 } from '../hooks/useElementStyles';
 import { styles } from '../styles';
 
@@ -23,6 +24,7 @@ export const TextToolbar: React.FC<TextToolbarProps> = ({ editor, element, onDel
   const isBold = useFontWeight(element);
   const isItalic = useFontStyle(element);
   const isUnderline = useTextDecoration(element);
+  const textAlign = useTextAlign(element);
 
   const styleManager = editor.styleManager;
 
@@ -50,6 +52,10 @@ export const TextToolbar: React.FC<TextToolbarProps> = ({ editor, element, onDel
     } else {
       styleManager.changeTextDecoration(element, 'underline');
     }
+  };
+
+  const handleTextAlign = (align: string) => {
+    styleManager.changeTextAlign(element, align);
   };
 
   return (
@@ -85,6 +91,43 @@ export const TextToolbar: React.FC<TextToolbarProps> = ({ editor, element, onDel
             title="下划线 (Ctrl+U)"
           >
             <u>U</u>
+          </button>
+        </div>
+      </div>
+
+      <div style={styles.divider} />
+
+      <div style={styles.section}>
+        <div style={styles.buttonGroup}>
+          <button
+            onClick={() => handleTextAlign('left')}
+            style={{
+              ...styles.iconButton,
+              ...(textAlign === 'left' ? styles.iconButtonActive : {}),
+            }}
+            title="左对齐"
+          >
+            L
+          </button>
+          <button
+            onClick={() => handleTextAlign('center')}
+            style={{
+              ...styles.iconButton,
+              ...(textAlign === 'center' ? styles.iconButtonActive : {}),
+            }}
+            title="居中"
+          >
+            C
+          </button>
+          <button
+            onClick={() => handleTextAlign('right')}
+            style={{
+              ...styles.iconButton,
+              ...(textAlign === 'right' ? styles.iconButtonActive : {}),
+            }}
+            title="右对齐"
+          >
+            R
           </button>
         </div>
       </div>

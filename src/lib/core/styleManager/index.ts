@@ -72,6 +72,14 @@ export class StyleManager {
     return true;
   }
 
+  changeTextAlign(element: HTMLElement | null, textAlign: string): boolean {
+    if (!element) element = this.editor.selectedElement;
+    if (!element) return false;
+    this.applyStyleWithHistory(element, 'text-align', textAlign);
+    this.editor.emit('styleChange', element, { textAlign });
+    return true;
+  }
+
   // 边距相关方法
   changeMargin(element: HTMLElement | null, margin: string): boolean {
     if (!element) element = this.editor.selectedElement;
