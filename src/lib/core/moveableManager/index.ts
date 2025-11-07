@@ -25,12 +25,14 @@ export class MoveableManager {
     this.editor = editor;
     this.eventsHandler = new MoveableEventsHandler(editor);
     this.options = {
-      renderDirections: ["nw", "ne", "sw", "se"],
-      keepRatio: true,
+      draggable: true,
+      scalable: false,
+      resizable: true,
+      renderDirections: ["nw", "ne", "sw", "se", "n", "s", "w", "e"],
+      keepRatio: false,
       throttleDrag: 0,
       throttleResize: 0,
       throttleScale: 0,
-
       // 默认开启吸附与标尺线
       snappable: true,
       snapCenter: true,
@@ -90,8 +92,9 @@ export class MoveableManager {
 
     this.instance = new Moveable(root, {
       target: element,
-      draggable: true,
-      scalable: true,
+      draggable: this.options.draggable,
+      scalable: this.options.scalable,
+      resizable: this.options.resizable,
       edgeDraggable: true,
       checkInput: true,
       origin: false,

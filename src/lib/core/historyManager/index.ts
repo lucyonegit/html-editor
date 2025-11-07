@@ -127,7 +127,9 @@ export class HistoryManager {
 
     // 如果只有一个命令，直接添加
     if (this.batchCommands.length === 1) {
-      this.push(this.batchCommands[0]);
+      const command = this.batchCommands[0];
+      this.batchCommands = null;
+      this.push(command);
     } else {
       const timestamp = Date.now();
       // 创建批量命令

@@ -14,6 +14,7 @@ import EditorRegistry from '../editorRegistry';
 import { HelperBoxManager } from '../helperBoxManager';
 
 
+
 export class HTMLEditor {
   options: HTMLEditorOptions;
   selectedElement: HTMLElement | null;
@@ -78,8 +79,8 @@ export class HTMLEditor {
     this.eventManager = null;
     this.styleManager = null;
     this.moveableManager = null;
-    this.helperBoxManager = null;
     this.historyManager = null;
+    this.helperBoxManager = null;
     this.container = null;
     this.EditorRegistry = EditorRegistry;
     this.isIframe = false;
@@ -109,11 +110,11 @@ export class HTMLEditor {
     if (!container) {
       throw new Error('Container not found');
     }
-    // 检测container是否是iframe
-    this.detectIframe();
 
     this.container = container;
     this.container.classList.add('html-visual-editor');
+     // 检测container是否是iframe
+    this.detectIframe();
 
     // 注入编辑器样式
     this.injectStyles();
@@ -167,27 +168,24 @@ export class HTMLEditor {
 
   // 元素选择
   selectElement(element: HTMLElement): void {
+    const lastSelectedElement = this.selectedElement;
+    // 清除上一个选择
     this.clearSelection();
+
+    element.classList.add('selected-element');
+    element.setAttribute('data-element-type', getElementType(element));
+    this.selectedElement = element;
     // 启用 moveable
     if (this.options.enableMoveable && this.moveableManager) {
       this.moveableManager.enableFor(element);
     }
     // 如果是同一个元素，检查是否需要重新启用编辑
-    // if (element === this.selectedElement) {
-    //   // 如果元素不再是 contenteditable，重新启用编辑
-    //   if (this.options.enableContentEditable && element.getAttribute('contenteditable') !== 'true') {
-    //     this.enableElementEditing(element);
-    //   }
-    //   return;
-    // }
-    // 如果启用contenteditable，使元素可编辑
-    if (this.options.enableContentEditable) {
-      this.enableElementEditing(element);
+    if (element === lastSelectedElement) {
+      // 如果元素不再是 contenteditable，重新启用编辑
+      if (this.options.enableContentEditable && element.getAttribute('contenteditable') !== 'true') {
+        this.enableElementEditing(element);
+      }
     }
-
-    element.classList.add('selected-element');
-    element.setAttribute('data-element-type', getElementType(element));
-    this.selectedElement = element;
     const position = this.getBoundPostion(element);
     this.emit('elementSelect', element, position);
     
@@ -232,6 +230,7 @@ export class HTMLEditor {
       element.setAttribute('data-original-contenteditable', originalValue);
     }
 
+    document.execCommand('defaultParagraphSeparator', false, 'br');
     // 设置为可编辑
     element.setAttribute('contenteditable', 'true');
 
@@ -247,11 +246,31 @@ export class HTMLEditor {
       this.disableElementEditing(element);
     };
 
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        // 插入换行符
+        // document.execCommand('insertHTML', false, '<br><br>');
+        const selection = this.isIframe ? this.container!.ownerDocument.getSelection() : window.getSelection()
+        if (!selection || !selection.rangeCount) return;
+        const range = selection.getRangeAt(0);
+        const br = document.createElement('br');
+        range.insertNode(br);
+        // 光标移动到 <br> 之后
+        range.setStartAfter(br);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        this.emit('contentChange');
+      }
+    }
+
     element.addEventListener('input', handleInput);
     element.addEventListener('blur', handleBlur);
+    element.addEventListener('keydown', handleKeyDown);
 
     // 保存事件处理器引用，便于后续清理
-    (element as any).__editHandlers = { handleInput, handleBlur };
+    (element as any).__editHandlers = { handleInput, handleBlur,handleKeyDown};
   }
 
   /**

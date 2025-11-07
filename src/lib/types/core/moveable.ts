@@ -2,7 +2,10 @@
  * Core Types: Moveable
  */
 export interface MoveableOptions {
-  renderDirections?: Array<"nw" | "ne" | "sw" | "se">;
+  draggable?: boolean;
+  scalable?: boolean;
+  resizable?: boolean;
+  renderDirections?: Array<"nw" | "ne" | "sw" | "se" | "n" | "s" | "w" | "e">;
   keepRatio?: boolean;
   throttleDrag?: number;
   throttleResize?: number;

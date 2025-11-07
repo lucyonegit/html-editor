@@ -41,7 +41,7 @@ export function createElementTagChangeCommand(
   if (headingLevels[upperCaseNewTag]) {
     newElement.style.fontSize = headingLevels[upperCaseNewTag];
   } else {
-    newElement.style.fontSize = '14px';
+    newElement.style.fontSize = '18px';
   }
 
   // Copy content

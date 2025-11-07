@@ -26,9 +26,9 @@ export class EventManager {
   }
 
 
+
   bindHoverEvents(): void {
     const handleMouseOver = (e: Event) => {
-      
       // 如果正在进行拖动、缩放等操作，不处理 hover
       if (this.editor.isOperating()) {
         return;
@@ -62,6 +62,9 @@ export class EventManager {
         this.editor.helperBoxManager.updatePostion(position);
         this.editor.helperBoxManager.visible(!(this.editor.selectedElement === target));
       }
+
+      
+
       this.editor.emit('hover', target, position);
     };
 
@@ -90,10 +93,10 @@ export class EventManager {
   bindClickEvents(): void {
     const handleClick = (e: Event) => {
       const target = e.target as HTMLElement;
+
       const targetTagName = target.tagName.toLowerCase();
       // 如果包含在忽略的标签中，不处理
       if((this.editor.options.ignoreSelectTags||[]).includes(targetTagName)) return;
-
 
       // 如果正在进行拖动或缩放操作，不处理点击
       if (this.editor.isDragging || this.editor.isResizing) {
@@ -128,10 +131,12 @@ export class EventManager {
       if (this.editor.isOperating()) {
         return;
       }
-
       if (this.editor.container &&
           !this.editor.container.contains(target) &&
-          !target.closest('.floating-toolbar')) {
+        !target.closest('.html-editor-toolbar') && 
+        !target.closest('.html-editor-heading-dropdown') &&
+        !target.closest('.ant-color-picker-inner')
+      ) {
         this.editor.clearSelection();
       }
     };

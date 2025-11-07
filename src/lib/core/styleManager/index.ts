@@ -205,24 +205,8 @@ export class StyleManager {
     if (this.editor.historyManager) {
       this.editor.historyManager.push(command);
     }
-
-    // Reselect the new element
+    
     this.editor.selectElement(newElement);
-
-    // Apply default styles for headings
-    // const headingLevels: { [key: string]: string } = {
-    //   H1: '28px',
-    //   H2: '26px',
-    //   H3: '24px',
-    //   H4: '22px',
-    //   H5: '20px',
-    //   H6: '18px',
-    // };
-
-    // const upperCaseNewTag = newTag.toUpperCase();
-    // if (headingLevels[upperCaseNewTag]) {
-    //   this.applyStyleWithHistory(newElement, 'font-size', headingLevels[upperCaseNewTag]);
-    // }
 
     this.editor.emit('contentChange');
 
