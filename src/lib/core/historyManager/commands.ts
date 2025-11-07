@@ -12,6 +12,7 @@ import {
   ElementDeleteCommand,
   ElementTagChangeCommand,
   BatchCommand,
+  AttributeChangeCommand,
 } from './types';
 
 /**
@@ -113,6 +114,56 @@ export function createStyleChangeCommand(
         command.timestamp - time < 1000
       ) {
         this.newValue = (command as StyleChangeCommand).newValue;
+        this.timestamp = command.timestamp;
+        return true;
+      }
+      return false;
+    },
+  };
+}
+
+/**
+ * 创建属性变更命令
+ */
+export function createAttributeChangeCommand(
+  element: HTMLElement,
+  attrName: string,
+  oldValue: string | null,
+  newValue: string | null
+): AttributeChangeCommand {
+  const time = Date.now();
+  return {
+    type: OperationType.ATTRIBUTE_CHANGE,
+    timestamp: time,
+    element,
+    attrName,
+    oldValue,
+    newValue,
+
+    execute() {
+      if (newValue === null || newValue === undefined) {
+        element.removeAttribute(attrName);
+      } else {
+        element.setAttribute(attrName, newValue);
+      }
+    },
+
+    undo() {
+      if (oldValue === null || oldValue === undefined) {
+        element.removeAttribute(attrName);
+      } else {
+        element.setAttribute(attrName, oldValue);
+      }
+    },
+
+    merge(command: Command): boolean {
+      if (
+        command.type === OperationType.ATTRIBUTE_CHANGE &&
+        (command as AttributeChangeCommand).element === element &&
+        (command as AttributeChangeCommand).attrName === attrName &&
+        command.timestamp - time < 1000
+      ) {
+        this.newValue = (command as AttributeChangeCommand).newValue;
         this.timestamp = command.timestamp;
         return true;
       }

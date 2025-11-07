@@ -42,7 +42,7 @@ export const Tooltip: React.FC<TooltipProps> = ({ editor, element, position }) =
     <div style={tooltipStyle} className="floating-toolbar">
       {isText && <TextToolbar editor={editor} element={element} onDelete={handleDelete} />}
       {isBlock && <BlockToolbar editor={editor} element={element} onDelete={handleDelete} />}
-      {isImage && <ImageToolbar onDelete={handleDelete} />}
+      {isImage && <ImageToolbar editor={editor} element={element} onDelete={handleDelete} />}
     </div>
   );
 };

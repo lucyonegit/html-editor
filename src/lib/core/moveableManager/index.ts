@@ -56,7 +56,7 @@ export class MoveableManager {
     };
   }
 
-  enableFor(element: HTMLElement) {
+  enableFor(element: HTMLElement, overrides?: Partial<MoveableOptions>) {
     this.destroy();
 
     // 启用前准备：禁用 contenteditable 与选择，避免拖拽被当作文本选择
@@ -90,34 +90,36 @@ export class MoveableManager {
 
     const root = element.ownerDocument?.body || document.body;
 
+    const mergedOptions: MoveableOptions = { ...this.options, ...(overrides || {}) };
+
     this.instance = new Moveable(root, {
       target: element,
-      draggable: this.options.draggable,
-      scalable: this.options.scalable,
-      resizable: this.options.resizable,
+      draggable: mergedOptions.draggable,
+      scalable: mergedOptions.scalable,
+      resizable: mergedOptions.resizable,
       edgeDraggable: true,
       checkInput: true,
       origin: false,
 
       // 缩放手柄
-      renderDirections: this.options.renderDirections,
-      keepRatio: this.options.keepRatio,
+      renderDirections: mergedOptions.renderDirections,
+      keepRatio: mergedOptions.keepRatio,
 
       // 性能相关
-      throttleDrag: this.options.throttleDrag,
-      throttleScale: this.options.throttleScale,
+      throttleDrag: mergedOptions.throttleDrag,
+      throttleScale: mergedOptions.throttleScale,
 
       // 吸附与对齐线
-      snappable: this.options.snappable,
+      snappable: mergedOptions.snappable,
       snapContainer: container,
       elementGuidelines: autoGuidelines,
       horizontalGuidelines: hGuides,
       verticalGuidelines: vGuides,
       // 提高阈值，避免吸附过强导致"拖不动"的感觉
-      snapThreshold: this.options.snapThreshold ?? 10,
-      snapGridWidth: this.options.snapGridWidth,
-      snapGridHeight: this.options.snapGridHeight,
-      snapDirections: this.options.snapDirections,
+      snapThreshold: mergedOptions.snapThreshold ?? 10,
+      snapGridWidth: mergedOptions.snapGridWidth,
+      snapGridHeight: mergedOptions.snapGridHeight,
+      snapDirections: mergedOptions.snapDirections,
     });
 
     // 绑定拖拽和缩放事件

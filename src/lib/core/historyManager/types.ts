@@ -13,6 +13,7 @@ export enum OperationType {
   ELEMENT_DELETE = 'element_delete',
   ELEMENT_MOVE = 'element_move',
   ELEMENT_TAG_CHANGE = 'element_tag_change',
+  ATTRIBUTE_CHANGE = 'attribute_change',
   BATCH = 'batch',
 }
 
@@ -46,6 +47,17 @@ export interface ContentChangeCommand extends Command {
   element: HTMLElement;
   oldContent: string;
   newContent: string;
+}
+
+/**
+ * 属性变更命令
+ */
+export interface AttributeChangeCommand extends Command {
+  type: OperationType.ATTRIBUTE_CHANGE;
+  element: HTMLElement;
+  attrName: string;
+  oldValue: string | null;
+  newValue: string | null;
 }
 
 /**

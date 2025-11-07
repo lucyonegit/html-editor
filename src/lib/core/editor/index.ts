@@ -6,10 +6,10 @@ import { EventManager } from '../eventManager'
 import StyleManager from '../styleManager';
 import { MoveableManager } from '../moveableManager';
 import { HistoryManager } from '../historyManager';
-import { createElementAddCommand, createElementDeleteCommand } from '../historyManager/commands';
+import { createElementAddCommand, createElementDeleteCommand, createStyleChangeCommand, createAttributeChangeCommand } from '../historyManager/commands';
 import { defaultStyleConfig, generateEditorCSS } from '../../config/styles';
 import type { HTMLEditorOptions, Position, EditorStyleConfig } from '../../types';
-import { createElement, getElementType } from '../utils';
+import { createElement, getElementType, isImageElement } from '../utils';
 import EditorRegistry from '../editorRegistry';
 import { HelperBoxManager } from '../helperBoxManager';
 
@@ -177,7 +177,9 @@ export class HTMLEditor {
     this.selectedElement = element;
     // 启用 moveable
     if (this.options.enableMoveable && this.moveableManager) {
-      this.moveableManager.enableFor(element);
+      const defaultMoveable = (this.options as any).moveableOptions ?? {};
+      const keepRatio = isImageElement(element) ? true : (defaultMoveable.keepRatio ?? false);
+      this.moveableManager.enableFor(element, { keepRatio });
     }
     // 如果是同一个元素，检查是否需要重新启用编辑
     if (element === lastSelectedElement) {
@@ -420,6 +422,39 @@ export class HTMLEditor {
     this.selectElement(cloned);
     this.emit('contentChange');
     return cloned;
+  }
+
+  /**
+   * 替换图片/背景图为远程 URL
+   */
+  replaceImage(element: HTMLElement | null = this.selectedElement, url: string): boolean {
+    if (!element || !url) return false;
+
+    const tag = element.tagName.toLowerCase();
+    if (tag === 'img') {
+      const oldSrc = element.getAttribute('src');
+      const newSrc = url;
+      if (this.historyManager) {
+        const cmd = createAttributeChangeCommand(element, 'src', oldSrc, newSrc);
+        cmd.execute();
+        this.historyManager.push(cmd);
+      } else {
+        element.setAttribute('src', newSrc);
+      }
+    } else {
+      const oldBg = element.style.backgroundImage || '';
+      const newBg = `url(${url})`;
+      if (this.historyManager) {
+        const cmd = createStyleChangeCommand(element, 'background-image', oldBg, newBg);
+        cmd.execute();
+        this.historyManager.push(cmd);
+      } else {
+        element.style.backgroundImage = newBg;
+      }
+    }
+
+    this.emit('contentChange');
+    return true;
   }
 
   // 事件系统
