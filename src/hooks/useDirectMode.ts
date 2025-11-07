@@ -25,6 +25,7 @@ export function useDirectMode(
     const targetContainer = containerRef.current;
 
     const editor = new HTMLEditor({
+      id:'html-editor-direct',
       styleConfig: options?.styleConfig,
       helperBox: false, // 启用 helperBox
       enableMoveable: false,

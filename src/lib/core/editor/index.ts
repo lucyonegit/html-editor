@@ -6,7 +6,7 @@ import { EventManager } from '../eventManager'
 import StyleManager from '../styleManager';
 import { MoveableManager } from '../moveableManager';
 import { HistoryManager } from '../historyManager';
-import { createElementAddCommand, createElementDeleteCommand, createStyleChangeCommand, createAttributeChangeCommand } from '../historyManager/commands';
+import { createElementAddCommand, createElementDeleteCommand,createAttributeChangeCommand, createStyleChangeCommand } from '../historyManager/commands';
 import { defaultStyleConfig, generateEditorCSS } from '../../config/styles';
 import type { HTMLEditorOptions, Position, EditorStyleConfig } from '../../types';
 import { createElement, getElementType, isImageElement } from '../utils';
@@ -16,6 +16,7 @@ import { HelperBoxManager } from '../helperBoxManager';
 
 
 export class HTMLEditor {
+  id: string;
   options: HTMLEditorOptions;
   selectedElement: HTMLElement | null;
 
@@ -34,7 +35,7 @@ export class HTMLEditor {
   isChangingColor: boolean = false;
   isIframe: boolean;
 
-  constructor(options: HTMLEditorOptions = {}) {
+  constructor(options: HTMLEditorOptions) {
     this.options = {
       container: null,
       theme: 'default',
@@ -74,6 +75,7 @@ export class HTMLEditor {
       };
     }
 
+    this.id = this.options.id;
     this.selectedElement = null;
 
     this.eventManager = null;
@@ -177,9 +179,9 @@ export class HTMLEditor {
     this.selectedElement = element;
     // 启用 moveable
     if (this.options.enableMoveable && this.moveableManager) {
-      const defaultMoveable = (this.options as any).moveableOptions ?? {};
-      const keepRatio = isImageElement(element) ? true : (defaultMoveable.keepRatio ?? false);
-      this.moveableManager.enableFor(element, { keepRatio });
+      const defaultMoveableOptions = (this.options as any).moveableOptions ?? {};
+      const keepRatio = isImageElement(element) ? true : (defaultMoveableOptions.keepRatio ?? false);
+      this.moveableManager.enableFor(element,{ keepRatio });
     }
     // 如果是同一个元素，检查是否需要重新启用编辑
     if (element === lastSelectedElement) {
@@ -392,9 +394,7 @@ export class HTMLEditor {
     return true;
   }
 
-  /**
-   * 复制元素并插入到当前元素的同级下方
-   */
+  // 复制元素并插入到当前元素的同级下方
   copyElement(element: HTMLElement | null = this.selectedElement): HTMLElement | null {
     if (!element || element === this.container) return null;
 
@@ -408,7 +408,6 @@ export class HTMLEditor {
     // 清理编辑器相关状态类与属性
     cloned.classList.remove('selected-element', 'hover-highlight');
     cloned.removeAttribute('data-element-type');
-    cloned.setAttribute('isClone', 'true');
 
     if (this.historyManager) {
       const command = createElementAddCommand(cloned, parent, nextSibling);

@@ -12,7 +12,7 @@ import {
   ElementDeleteCommand,
   ElementTagChangeCommand,
   BatchCommand,
-  AttributeChangeCommand,
+  AttributeChangeCommand
 } from './types';
 
 /**

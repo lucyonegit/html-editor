@@ -14,9 +14,14 @@ export function getElementType(element: HTMLElement): string {
   return typeMap[tagName] || tagName.toUpperCase();
 }
 
+export function isDivWithText(element: HTMLElement): boolean {
+  const elementWithText = !!element.textContent?.trim() && element.children.length === 0;
+  return element.tagName.toLowerCase() === 'div' && elementWithText
+}
+
 export function isTextElement(element: HTMLElement): boolean {
   const textTags = ['p', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'strong', 'em'];
-  return textTags.includes(element.tagName.toLowerCase());
+  return textTags.includes(element.tagName.toLowerCase()) || isDivWithText(element);
 }
 
 export function isDivWithImage(element: HTMLElement): boolean {
@@ -29,8 +34,8 @@ export function isDivWithImage(element: HTMLElement): boolean {
 }
 
 export function isBlockElement(element: HTMLElement): boolean {
-  const blockTags = ['div', 'section', 'article', 'header', 'footer', 'main', 'body'];
-  return blockTags.includes(element.tagName.toLowerCase()) && !isDivWithImage(element);
+  const blockTags = ['div', 'section', 'article', 'header', 'footer', 'main', 'body', 'ol', 'ul','li'];
+  return blockTags.includes(element.tagName.toLowerCase()) && !isDivWithImage(element) && !isDivWithText(element);
 }
 
 export function isImageElement(element: HTMLElement): boolean {

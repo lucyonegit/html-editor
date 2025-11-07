@@ -56,41 +56,40 @@ export class MoveableManager {
     };
   }
 
-  enableFor(element: HTMLElement, overrides?: Partial<MoveableOptions>) {
+  enableFor(element: HTMLElement, options?: Partial<MoveableOptions>): void {
     this.destroy();
 
     // 启用前准备：禁用 contenteditable 与选择，避免拖拽被当作文本选择
     this.prepareElement(element);
+    const mergedOptions: MoveableOptions = { ...this.options, ...(options || {}) };
 
     // 获取容器元素
     const container = MoveableGuidelinesHandler.getContainer(
       element,
       this.editor.container,
-      this.options.snapContainer ?? null
+      mergedOptions.snapContainer ?? null
     );
 
     // 计算自动对齐参考线
     const autoGuidelines = MoveableGuidelinesHandler.calculateAutoGuidelines(
       element,
       container,
-      this.options.elementGuidelines
+      mergedOptions.elementGuidelines
     );
 
     // 计算水平标尺线
     const hGuides = MoveableGuidelinesHandler.calculateHorizontalGuidelines(
       container,
-      this.options.horizontalGuidelines
+      mergedOptions.horizontalGuidelines
     );
 
     // 计算垂直标尺线
     const vGuides = MoveableGuidelinesHandler.calculateVerticalGuidelines(
       container,
-      this.options.verticalGuidelines
+      mergedOptions.verticalGuidelines
     );
 
     const root = element.ownerDocument?.body || document.body;
-
-    const mergedOptions: MoveableOptions = { ...this.options, ...(overrides || {}) };
 
     this.instance = new Moveable(root, {
       target: element,

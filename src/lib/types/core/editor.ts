@@ -17,6 +17,7 @@ export interface Position {
 }
 
 export interface HTMLEditorOptions {
+  id:string,
   container?: HTMLElement | string | null;
   enableMoveable?: boolean;
   enableHistory?: boolean; // 是否启用历史记录

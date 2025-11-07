@@ -92,6 +92,7 @@ export function useIframeMode(
       editorRef.current.destroy();
     }
     const editor = new HTMLEditor({
+      id:'html-editor-iframe',
       ...options,
       helperBox: true, // 启用 helperBox
       enableMoveable: true,

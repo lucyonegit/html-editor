@@ -32,68 +32,92 @@ export class StyleManager {
   }
 
   // 字体相关方法
-  changeFont(element: HTMLElement | null, fontFamily: string): boolean {
+  changeFont(element: HTMLElement | null, fontFamily: string, triggerContentChange = true): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
     this.applyStyleWithHistory(element, 'font-family', fontFamily);
     this.editor.emit('styleChange', element, { fontFamily });
+    if (triggerContentChange) {
+      this.editor.emit('contentChange');
+    }
     return true;
   }
 
-  changeFontSize(element: HTMLElement | null, fontSize: string): boolean {
+  changeFontSize(element: HTMLElement | null, fontSize: string, triggerContentChange = true): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
     this.applyStyleWithHistory(element, 'font-size', fontSize);
     this.editor.emit('styleChange', element, { fontSize });
+    if (triggerContentChange) {
+      this.editor.emit('contentChange');
+    }
     return true;
   }
 
-  changeFontWeight(element: HTMLElement | null, fontWeight: string): boolean {
+  changeFontWeight(element: HTMLElement | null, fontWeight: string, triggerContentChange = true): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
     this.applyStyleWithHistory(element, 'font-weight', fontWeight);
     this.editor.emit('styleChange', element, { fontWeight });
+    if (triggerContentChange) {
+      this.editor.emit('contentChange');
+    }
     return true;
   }
 
-  changeFontStyle(element: HTMLElement | null, fontStyle: string): boolean {
+  changeFontStyle(element: HTMLElement | null, fontStyle: string, triggerContentChange = true): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
     this.applyStyleWithHistory(element, 'font-style', fontStyle);
     this.editor.emit('styleChange', element, { fontStyle });
+    if (triggerContentChange) {
+      this.editor.emit('contentChange');
+    }
     return true;
   }
 
-  changeTextDecoration(element: HTMLElement | null, textDecoration: string): boolean {
+  changeTextDecoration(element: HTMLElement | null, textDecoration: string, triggerContentChange = true): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
     this.applyStyleWithHistory(element, 'text-decoration', textDecoration);
     this.editor.emit('styleChange', element, { textDecoration });
+    if (triggerContentChange) {
+      this.editor.emit('contentChange');
+    }
     return true;
   }
 
-  changeTextAlign(element: HTMLElement | null, textAlign: string): boolean {
+  changeTextAlign(element: HTMLElement | null, textAlign: string, triggerContentChange = true): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
     this.applyStyleWithHistory(element, 'text-align', textAlign);
     this.editor.emit('styleChange', element, { textAlign });
+    if (triggerContentChange) {
+      this.editor.emit('contentChange');
+    }
     return true;
   }
 
   // 边距相关方法
-  changeMargin(element: HTMLElement | null, margin: string): boolean {
+  changeMargin(element: HTMLElement | null, margin: string, triggerContentChange = true): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
     this.applyStyleWithHistory(element, 'margin', margin);
     this.editor.emit('styleChange', element, { margin });
+    if (triggerContentChange) {
+      this.editor.emit('contentChange');
+    }
     return true;
   }
 
-  changePadding(element: HTMLElement | null, padding: string): boolean {
+  changePadding(element: HTMLElement | null, padding: string,triggerContentChange = true): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
     this.applyStyleWithHistory(element, 'padding', padding);
     this.editor.emit('styleChange', element, { padding });
+    if (triggerContentChange) {
+      this.editor.emit('contentChange');
+    }
     return true;
   }
 
@@ -124,11 +148,14 @@ export class StyleManager {
   }
 
   // 边框相关方法
-  changeBorder(element: HTMLElement | null, border: string): boolean {
+  changeBorder(element: HTMLElement | null, border: string, triggerContentChange = true): boolean {
     if (!element) element = this.editor.selectedElement;
     if (!element) return false;
     this.applyStyleWithHistory(element, 'border', border);
     this.editor.emit('styleChange', element, { border });
+    if (triggerContentChange) {
+      this.editor.emit('contentChange');
+    }
     return true;
   }
 
@@ -143,14 +170,17 @@ export class StyleManager {
     return true;
   }
 
-  applyTextStyle(property: string, value: string): boolean {
+  applyTextStyle(property: string, value: string, triggerContentChange = true): boolean {
     if (!this.editor.selectedElement) return false;
     this.applyStyleWithHistory(this.editor.selectedElement, property, value);
     this.editor.emit('styleChange', this.editor.selectedElement, { [property]: value });
+    if (triggerContentChange) {
+      this.editor.emit('contentChange');
+    }
     return true;
   }
 
-  applyBlockStyle(property: string, value: string): boolean {
+  applyBlockStyle(property: string, value: string, triggerContentChange = true): boolean {
     if (!this.editor.selectedElement) return false;
 
     const el = this.editor.selectedElement;
@@ -170,6 +200,9 @@ export class StyleManager {
 
     this.applyStyleWithHistory(el, prop, value);
     this.editor.emit('styleChange', el, { [prop]: value });
+    if (triggerContentChange) {
+      this.editor.emit('contentChange');
+    }
     return true;
   }
 
@@ -191,7 +224,7 @@ export class StyleManager {
     };
   }
 
-  changeElementTag(element: HTMLElement, newTag: string): HTMLElement | null {
+  changeElementTag(element: HTMLElement, newTag: string, triggerContentChange = true): HTMLElement | null {
     if (!element || !element.parentNode || !newTag) {
       return null;
     }
@@ -209,6 +242,9 @@ export class StyleManager {
     this.editor.selectElement(newElement);
 
     this.editor.emit('contentChange');
+    if (triggerContentChange) {
+      this.editor.emit('contentChange');
+    }
 
     return newElement;
   }
