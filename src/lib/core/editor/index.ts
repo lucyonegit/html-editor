@@ -390,6 +390,38 @@ export class HTMLEditor {
     return true;
   }
 
+  /**
+   * 复制元素并插入到当前元素的同级下方
+   */
+  copyElement(element: HTMLElement | null = this.selectedElement): HTMLElement | null {
+    if (!element || element === this.container) return null;
+
+    const parent = element.parentElement;
+    const nextSibling = element.nextSibling as HTMLElement | null;
+    if (!parent) return null;
+
+    // 深拷贝节点，包括子元素与样式
+    const cloned = element.cloneNode(true) as HTMLElement;
+
+    // 清理编辑器相关状态类与属性
+    cloned.classList.remove('selected-element', 'hover-highlight');
+    cloned.removeAttribute('data-element-type');
+    cloned.setAttribute('isClone', 'true');
+
+    if (this.historyManager) {
+      const command = createElementAddCommand(cloned, parent, nextSibling);
+      command.execute();
+      this.historyManager.push(command);
+    } else {
+      parent.insertBefore(cloned, nextSibling);
+    }
+
+    // 选中新复制的元素
+    this.selectElement(cloned);
+    this.emit('contentChange');
+    return cloned;
+  }
+
   // 事件系统
   emit(eventName: string, ...args: any[]): void {
     const callbackName = `on${eventName.charAt(0).toUpperCase() + eventName.slice(1)}` as keyof HTMLEditorOptions;

@@ -120,6 +120,14 @@ export const BlockToolbar: React.FC<BlockToolbarProps> = ({ editor, element, onD
 
       <div style={styles.divider} />
 
+      {/* 复制与删除 */}
+      <button
+        onClick={() => editor.copyElement(element)}
+        style={styles.iconButton}
+        title="复制"
+      >
+        📋
+      </button>
       <button
         onClick={onDelete}
         style={styles.deleteButton}
