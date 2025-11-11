@@ -9,7 +9,7 @@ import { HistoryManager } from '../historyManager';
 import { createElementAddCommand, createElementDeleteCommand,createAttributeChangeCommand, createStyleChangeCommand } from '../historyManager/commands';
 import { defaultStyleConfig, generateEditorCSS } from '../../config/styles';
 import type { HTMLEditorOptions, Position, EditorStyleConfig } from '../../types';
-import { createElement, getElementType, isImageElement } from '../utils';
+import { createElement, elementWatcher, getElementType, isImageElement } from '../utils';
 import EditorRegistry from '../editorRegistry';
 import { HelperBoxManager } from '../helperBoxManager';
 
@@ -27,6 +27,7 @@ export class HTMLEditor {
   helperBoxManager: HelperBoxManager | null;
   container: HTMLElement | null;
   EditorRegistry: typeof EditorRegistry;
+  elementWatcher: ReturnType<typeof elementWatcher> | null;
 
   // 操作状态
   isDragging: boolean = false;
@@ -83,6 +84,7 @@ export class HTMLEditor {
     this.moveableManager = null;
     this.historyManager = null;
     this.helperBoxManager = null;
+    this.elementWatcher = null;
     this.container = null;
     this.EditorRegistry = EditorRegistry;
     this.isIframe = false;
@@ -98,6 +100,7 @@ export class HTMLEditor {
     this.EditorRegistry.register(this);
     this.initializeManagers();
     this.bindEvents();
+    this.elementWatcher = elementWatcher(this);
     if (this.options.helperBox) {
       this.helperBoxManager?.init();
     }
@@ -142,7 +145,10 @@ export class HTMLEditor {
     const styleId = 'html-editor-styles';
 
     // 检查是否已经注入过样式
-    if (doc.getElementById(styleId)) return;
+    const oldStyleElement = doc.getElementById(styleId);
+    if (oldStyleElement) {
+      doc.head.removeChild(doc.getElementById(styleId) as Node);
+    };
 
     const styleElement = doc.createElement('style');
     styleElement.id = styleId;
@@ -192,6 +198,10 @@ export class HTMLEditor {
     }
     const position = this.getBoundPostion(element);
     this.emit('elementSelect', element, position);
+    this.elementWatcher?.start(element, () => {
+      this.emit('styleChange', element);
+      this.moveableManager?.update();
+    });
     
     // 如果启用了 helperBox，则更新其位置
     if (this.options.helperBox && this.helperBoxManager) {
@@ -305,6 +315,7 @@ export class HTMLEditor {
 
   clearSelection(): void {
     if (this.selectedElement) {
+      this.elementWatcher?.stop(this.selectedElement);
       this.selectedElement.classList.remove('selected-element');
       this.selectedElement.removeAttribute('data-element-type');
       // 禁用编辑功能
@@ -355,12 +366,12 @@ export class HTMLEditor {
   }
 
   // 元素操作
-  addElement(type: string, content: string = ''): HTMLElement {
+  addElement(selectedElement: HTMLElement, type: string, content: string = ''): HTMLElement {
     const element = createElement(type, content);
     if (this.container) {
       // 记录添加操作
       if (this.historyManager) {
-        const command = createElementAddCommand(element, this.container, null);
+        const command = createElementAddCommand(element, selectedElement, this.container, null);
         command.execute();
         this.historyManager.push(command);
       } else {
@@ -410,7 +421,7 @@ export class HTMLEditor {
     cloned.removeAttribute('data-element-type');
 
     if (this.historyManager) {
-      const command = createElementAddCommand(cloned, parent, nextSibling);
+      const command = createElementAddCommand(cloned, element, parent, nextSibling);
       command.execute();
       this.historyManager.push(command);
     } else {

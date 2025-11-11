@@ -28,6 +28,7 @@ export class EventManager {
 
 
   bindHoverEvents(): void {
+    const highlightTracker = this.editor.helperBoxManager?.createHighlightTracker();
     const handleMouseOver = (e: Event) => {
       // 如果正在进行拖动、缩放等操作，不处理 hover
       if (this.editor.isOperating()) {
@@ -56,16 +57,14 @@ export class EventManager {
       target.classList.add('hover-highlight');
       target.setAttribute('data-element-type', getElementType(target));
 
-      const position = this.editor.getBoundPostion(target);
-
       if (this.editor.options.helperBox && this.editor.helperBoxManager && this.editor.container) {
-        this.editor.helperBoxManager.updatePostion(position);
+        highlightTracker?.start(target);
+        // const position = this.editor.getBoundPostion(target);
+        // this.editor.helperBoxManager.updatePostion(position);
         this.editor.helperBoxManager.visible(!(this.editor.selectedElement === target));
       }
 
-      
-
-      this.editor.emit('hover', target, position);
+      this.editor.emit('hover', target);
     };
 
     const handleMouseOut = (e: Event) => {
@@ -77,9 +76,12 @@ export class EventManager {
 
       // 如果启用了 helperBox，则隐藏
       if (this.editor.options.helperBox && this.editor.helperBoxManager) {
+        highlightTracker?.stop(target);
         this.editor.helperBoxManager.visible(false);
       }
     };
+
+    
 
     if (this.editor.container) {
       this.editor.container.addEventListener('mouseover', handleMouseOver);

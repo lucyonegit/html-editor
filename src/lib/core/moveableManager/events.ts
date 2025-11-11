@@ -18,17 +18,18 @@ export class MoveableEventsHandler {
    */
   bindDragEvents(instance: Moveable) {
     let originalTransform: string | null = null;
+    let originTransition : string | null = null;
 
     instance.on("dragStart", ({ target, inputEvent }) => {
       const el = target as HTMLElement;
+      originalTransform = el.style.transform || "";
+      originTransition = el.style.transition || "";
       try {
         inputEvent?.preventDefault();
       } catch {}
       el.style.userSelect = "none";
+      el.style.transition = "none";
       this.editor.setDragging(true);
-      
-      // 记录初始状态
-      originalTransform = el.style.transform || "";
     });
 
     instance.on("drag", ({ target, transform }) => {
@@ -49,10 +50,11 @@ export class MoveableEventsHandler {
           this.editor.historyManager.push(command);
         }
       }
-      
+      el.style.transition = originTransition || "";
       this.editor.setDragging(false);
       this.editor.emit("contentChange");
       originalTransform = null;
+      originTransition = null;
     });
   }
 
@@ -102,7 +104,8 @@ export class MoveableEventsHandler {
    */
   bindResizeEvents(instance: Moveable) {
     let originalSize = { width: '0px', height: '0px' };
-    let originalTransform: string = '';
+    let originalTransform: string | null = '';
+    let originTransition : string | null = null;
     instance.on("resizeStart", (e) => {
       const ele = e.target as HTMLElement;
       const style = window.getComputedStyle(ele);
@@ -110,6 +113,7 @@ export class MoveableEventsHandler {
       e.target.blur();
       // 记录初始状态
       originalTransform = e.target.style.transform || "";
+      originTransition = e.target.style.transition || "";
       // 记录初始大小
       originalSize = {
         width: style.width,
@@ -134,7 +138,7 @@ export class MoveableEventsHandler {
       if (originalTransform !== newTransform) {
         // 
         this.editor.historyManager?.beginBatch();
-        const command = createStyleChangeCommand(el, "transform", originalTransform, newTransform);
+        const command = createStyleChangeCommand(el, "transform", originalTransform || '', newTransform);
         command.execute();
         this.editor.historyManager?.push(command);
         const sizeCommand = createStyleChangeCommand(el, "width", originalSize.width, el.style.width);
@@ -145,6 +149,10 @@ export class MoveableEventsHandler {
         this.editor.historyManager?.push(heightCommand);
         this.editor.historyManager?.endBatch();
       }
+
+      el.style.transition = originTransition || "";
+      originalTransform = null;
+      originTransition = null;
     });
   }
 

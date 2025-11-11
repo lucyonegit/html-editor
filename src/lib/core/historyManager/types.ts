@@ -26,6 +26,7 @@ export interface Command {
   execute: () => void;
   undo: () => void;
   merge?: (command: Command) => boolean;
+  [key: string]: any;
 }
 
 /**
@@ -66,6 +67,7 @@ export interface AttributeChangeCommand extends Command {
 export interface ElementAddCommand extends Command {
   type: OperationType.ELEMENT_ADD;
   element: HTMLElement;
+  selectedElement: HTMLElement;
   parent: HTMLElement;
   nextSibling: HTMLElement | null;
 }

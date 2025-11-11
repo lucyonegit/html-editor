@@ -49,7 +49,7 @@ export function generateEditorCSS(config: EditorStyleConfig = defaultStyleConfig
     ${scope} .hover-highlight {
       outline: ${helperBox ? 'none' : hover.outline} !important;
       outline-offset: ${hover.outlineOffset};
-      position: relative;
+      // position: relative;
       cursor: ${hover.cursor};
       ${hover.backgroundColor ? `background-color: ${hover.backgroundColor} !important;` : ''}
     }
@@ -58,7 +58,7 @@ export function generateEditorCSS(config: EditorStyleConfig = defaultStyleConfig
       outline: ${enableMoveable || helperBox ? 'none' : selected.outline} !important;
       outline-offset: ${selected.outlineOffset};
       cursor: ${selected.cursor};
-      position: relative;
+      // position: relative;
       ${selected.backgroundColor ? `background-color: ${selected.backgroundColor} !important;` : ''}
     }
 
@@ -79,14 +79,42 @@ export function generateEditorCSS(config: EditorStyleConfig = defaultStyleConfig
       content: attr(data-placeholder);
       color: #999;
     }
+
+    .moveable-control-box>.moveable-line{
+      background: #376CFF !important;
+      height: 2px !important;
+    }
+
+    .moveable-control-box>.moveable-control:not(.moveable-e):not(.moveable-w){
+      border: 2px solid #376CFF !important;
+      background: #fff !important;
+    }
+
+    .moveable-control-box>.moveable-control.moveable-e{
+      width: 10px !important;
+      height: 22px !important;
+      border-radius: 10px !important;
+      margin-top: -11px !important;
+      margin-left: -5px !important;
+      border: 2px solid #376CFF !important;
+      background: #fff !important;
+    }
+    .moveable-control-box>.moveable-control.moveable-w{
+      width: 10px !important;
+      height: 22px !important;
+      border-radius: 7px !important;
+      border: 2px solid #376CFF !important;
+      background: #fff !important;
+      margin-top: -11px !important;
+      margin-left: -5px !important;
+    }
   `;
 
   // 如果启用角标，添加 ::before 伪元素样式
   if (badge.enabled) {
     const badgePosition = getBadgePositionCSS(badge.position || 'top-left', badge.offset);
-
     css += `
-    ${scope} .hover-highlight::before {
+    ${scope} #html-editor-helper-box::before {
       content: attr(data-element-type);
       position: absolute;
       ${badgePosition}
@@ -98,21 +126,7 @@ export function generateEditorCSS(config: EditorStyleConfig = defaultStyleConfig
       font-family: ${badge.fontFamily};
       white-space: nowrap;
       z-index: ${badge.zIndex};
-    }
-    
-    ${scope} .selected-element::before {
-      content: attr(data-element-type);
-      position: absolute;
-      ${badgePosition}
-      background: ${badge.background};
-      color: ${badge.color};
-      padding: ${badge.padding};
-      border-radius: ${badge.borderRadius};
-      font-size: ${badge.fontSize};
-      font-family: ${badge.fontFamily};
-      white-space: nowrap;
-      z-index: ${badge.zIndex};
-    }
+    }}
     `;
   }
 

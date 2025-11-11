@@ -1,5 +1,6 @@
 import { Position } from "../../types";
 import { HTMLEditor } from "../editor";
+import { elementWatcher } from "../utils";
 
 export class HelperBoxManager {
   editor: HTMLEditor;
@@ -35,8 +36,22 @@ export class HelperBoxManager {
     if(!this.element) return;
     this.element.style.width = `${position.width}px`;
     this.element.style.height = `${position.height}px`;
-    this.element.style.top = `${position.top}px`;
+    this.element.style.top = `${position.top + this.editor.container!.scrollTop || 0}px`;
     this.element.style.left = `${position.left}px`;
+  }
+
+  // 创建高亮框,根据渲染帧刷新位置（解决dom有动画的case）
+  createHighlightTracker() {
+    const watcher = elementWatcher(this.editor);
+    return {
+      start:(element: HTMLElement)=>{
+        watcher.start(element, (postion) => {
+          this.updatePostion(postion);
+          this.element?.setAttribute('data-element-type', element.getAttribute('data-element-type') || '')
+        });
+      },
+      stop: watcher.stop,
+    };
   }
 
   visible(visible: boolean) {

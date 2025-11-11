@@ -61,8 +61,12 @@ export class HistoryManager {
     this.isExecuting = true;
     try {
       command.undo();
+      if(command.type === OperationType.ELEMENT_ADD) {
+        // 如果是添加元素操作，撤销时选中添加前的元素
+        this.editor.selectElement(command.selectedElement || null);
+      }
       this.redoStack.push(command);
-      this.notifyStateChange();
+      this.notifyStateChange(true);
       return true;
     } catch (error) {
       this.undoStack.push(command);
@@ -83,7 +87,7 @@ export class HistoryManager {
     try {
       command.execute();
       this.undoStack.push(command);
-      this.notifyStateChange();
+      this.notifyStateChange(true);
       return true;
     } catch (error) {
       this.redoStack.push(command);
@@ -202,8 +206,12 @@ export class HistoryManager {
   /**
    * 通知状态变化
    */
-  private notifyStateChange(): void {
+  private notifyStateChange(contentChange?: boolean): void {
     this.editor.emit('historyChange', this.getState());
+    if (contentChange) {
+      // 临时处理，之后所有的操作都需要通知
+      this.editor.emit('contentChange');
+    }
   }
 
   /**

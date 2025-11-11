@@ -215,6 +215,7 @@ export function createContentChangeCommand(
  */
 export function createElementAddCommand(
   element: HTMLElement,
+  selectedElement: HTMLElement,
   parent: HTMLElement,
   nextSibling: HTMLElement | null
 ): ElementAddCommand {
@@ -224,7 +225,7 @@ export function createElementAddCommand(
     element,
     parent,
     nextSibling,
-
+    selectedElement,
     execute() {
       if (nextSibling) {
         parent.insertBefore(element, nextSibling);

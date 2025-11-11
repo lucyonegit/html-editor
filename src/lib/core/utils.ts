@@ -2,6 +2,9 @@
  * 通用工具函数集合：与 HTMLEditor 实例 (this) 无关的逻辑
  */
 
+import { Position } from "../types";
+import { HTMLEditor } from "./editor";
+
 export function getElementType(element: HTMLElement): string {
   const tagName = element.tagName.toLowerCase();
   const typeMap: Record<string, string> = {
@@ -27,14 +30,14 @@ export function isTextElement(element: HTMLElement): boolean {
 export function isDivWithImage(element: HTMLElement): boolean {
   const computedStyle = window.getComputedStyle(element);
   const {backgroundImage, background} = computedStyle
-  const elementWithBgImage = !!backgroundImage && backgroundImage !== 'none'
+  const elementWithBgImage = !!backgroundImage && backgroundImage !== 'none' && backgroundImage.includes('url(')
   const elementBgWithUrl = !!background && background.includes('url(')
   const divWithbg = element.tagName.toLowerCase() === 'div' && element.children.length === 0 && (elementWithBgImage || elementBgWithUrl);
   return divWithbg
 }
 
 export function isBlockElement(element: HTMLElement): boolean {
-  const blockTags = ['div', 'section', 'article', 'header', 'footer', 'main', 'body', 'ol', 'ul','li'];
+  const blockTags = ['div', 'section', 'article', 'header', 'footer', 'main', 'body', 'ol', 'ul','li','button'];
   return blockTags.includes(element.tagName.toLowerCase()) && !isDivWithImage(element) && !isDivWithText(element);
 }
 
@@ -59,4 +62,48 @@ export function createElement(type: string, content: string = ''): HTMLElement {
   element.style.borderRadius = '4px';
 
   return element;
+}
+
+export const elementWatcher = ( editor: HTMLEditor) => {
+  let ele: HTMLElement | null = null;
+  let running = false;
+  let frameId: number | null = null;
+  let lastRect: Position | null = null;
+  const update = (element: HTMLElement, callback?:(postition: Position)=>void) => {
+    if (!running || !element.isConnected) return;
+
+    const postition = editor.getBoundPostion(element);
+
+    const hasChanged =
+      !lastRect ||
+      postition.left !== lastRect.left ||
+      postition.top !== lastRect.top ||
+      postition.width !== lastRect.width ||
+      postition.height !== lastRect.height ||
+      postition.right !== lastRect.right ||
+      postition.bottom !== lastRect.bottom;
+
+    if (hasChanged) {
+      lastRect = postition;
+      callback?.(postition);
+    }
+
+    // 下一帧继续
+    frameId = requestAnimationFrame(()=>update(element, callback));
+  }
+  return {
+    start:(element: HTMLElement, callback?:(position: Position)=>void)=>{
+      if (!running) { 
+        ele = element;
+        running = true;
+        update(element, callback);
+      }
+    },
+    stop: (element: HTMLElement) => {
+      if(ele !== element) return;
+      running = false;
+      if (frameId) cancelAnimationFrame(frameId);
+      frameId = null;
+    },
+  };
 }

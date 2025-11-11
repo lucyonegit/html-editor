@@ -125,6 +125,12 @@ export class MoveableManager {
     this.eventsHandler.bindAllEvents(this.instance);
   }
 
+  update() {
+    if (this.instance) {
+      this.instance.updateRect();
+    }
+  }
+
   destroy() {
     if (this.instance) {
       this.instance.destroy();
