@@ -138,7 +138,7 @@ export class StyleManager {
     if (!element) return false;
     // 使用批量操作记录 background 和 backgroundColor
     // this.editor.beginBatch();
-    this.applyStyleWithHistory(element, 'background-color', backgroundColor);
+    this.applyStyleWithHistory(element, 'background', backgroundColor);
     // this.editor.endBatch();
     this.editor.emit('styleChange', element, { backgroundColor, background: backgroundColor });
     if (triggerContentChange) {

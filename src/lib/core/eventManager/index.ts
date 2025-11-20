@@ -16,7 +16,6 @@ export class EventManager {
   constructor(editor: HTMLEditor) {
     this.editor = editor;
     this.boundHandlers = new Map<string, EventHandler>();
-
   }
 
   bindAll(): void {
@@ -28,7 +27,7 @@ export class EventManager {
 
 
   bindHoverEvents(): void {
-    const highlightTracker = this.editor.helperBoxManager?.createHighlightTracker();
+    const highlightTracker = this.editor.helperBoxManager.createHighlightTracker();
     const handleMouseOver = (e: Event) => {
       if (this.editor.isInsertMode) {
         return;
@@ -61,7 +60,7 @@ export class EventManager {
       target.setAttribute('data-element-type', getElementType(target));
 
       if (this.editor.options.helperBox && this.editor.helperBoxManager && this.editor.container) {
-        highlightTracker?.start(target);
+        highlightTracker.start(target);
         // const position = this.editor.getBoundPostion(target);
         // this.editor.helperBoxManager.updatePostion(position);
         this.editor.helperBoxManager.visible(!(this.editor.selectedElement === target));
@@ -82,7 +81,7 @@ export class EventManager {
 
       // 如果启用了 helperBox，则隐藏
       if (this.editor.options.helperBox && this.editor.helperBoxManager) {
-        highlightTracker?.stop(target);
+        highlightTracker.stop(target);
         this.editor.helperBoxManager.visible(false);
       }
     };
@@ -101,7 +100,6 @@ export class EventManager {
   bindClickEvents(): void {
     const handleClick = (e: Event) => {
       const target = e.target as HTMLElement;
-
       if (this.editor.isInsertMode) {
         e.stopPropagation();
         const me = e as MouseEvent;

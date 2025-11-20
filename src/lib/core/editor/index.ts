@@ -6,10 +6,16 @@ import { EventManager } from '../eventManager'
 import StyleManager from '../styleManager';
 import { MoveableManager } from '../moveableManager';
 import { HistoryManager } from '../historyManager';
-import { createElementAddCommand, createElementDeleteCommand,createAttributeChangeCommand, createStyleChangeCommand, createContentChangeCommand } from '../historyManager/commands';
+import {
+  createElementAddCommand,
+  createElementDeleteCommand,
+  createAttributeChangeCommand,
+  createStyleChangeCommand,
+  createContentChangeCommand
+} from '../historyManager/commands';
 import { defaultStyleConfig, generateEditorCSS } from '../../config/styles';
 import type { HTMLEditorOptions, Position, EditorStyleConfig } from '../../types';
-import { createElement, elementWatcher, getElementType, isImageElement } from '../utils';
+import { createElement, elementWatcher, getElementType, isImageElement, isInlineElement, isTableElement } from '../utils';
 import EditorRegistry from '../editorRegistry';
 import { HelperBoxManager } from '../helperBoxManager';
 
@@ -27,14 +33,14 @@ export class HTMLEditor {
   helperBoxManager: HelperBoxManager | null;
   container: HTMLElement | null;
   EditorRegistry: typeof EditorRegistry;
-  elementWatcher: ReturnType<typeof elementWatcher> | null;
+  elementWatcher: ReturnType<typeof elementWatcher>;
 
   // 操作状态
   isDragging: boolean = false;
   isResizing: boolean = false;
   isChangingBackground: boolean = false;
-  isChangingColor: boolean = false;
   isInsertMode: boolean = false;
+  isChangingColor: boolean = false;
   isIframe: boolean;
 
   constructor(options: HTMLEditorOptions) {
@@ -55,7 +61,7 @@ export class HTMLEditor {
       onContentChange: null,
       onReady: null,
       onHistoryChange: null,
-      ignoreSelectTags: ['body', 'html','i'],
+      ignoreSelectTags: ['body', 'html'],
       ...options
     };
 
@@ -85,7 +91,6 @@ export class HTMLEditor {
     this.moveableManager = null;
     this.historyManager = null;
     this.helperBoxManager = null;
-    this.elementWatcher = null;
     this.container = null;
     this.EditorRegistry = EditorRegistry;
     this.isIframe = false;
@@ -179,30 +184,47 @@ export class HTMLEditor {
   selectElement(element: HTMLElement): void {
     if (this.isInsertMode) return;
     const lastSelectedElement = this.selectedElement;
+    if (lastSelectedElement) {
+      lastSelectedElement.style.cursor = 'pointer';
+    }
     // 清除上一个选择
     this.clearSelection();
 
     element.classList.add('selected-element');
     element.setAttribute('data-element-type', getElementType(element));
+    if (isInlineElement(element)) {
+      // 如果元素是内联元素，设置为 inline-block，解决moveable无法拖拽的问题
+      element.style.display = 'inline-block';
+      element.setAttribute('original-display', 'inline');
+    }
     this.selectedElement = element;
+    const isTable = isTableElement(element);
     // 启用 moveable
     if (this.options.enableMoveable && this.moveableManager) {
       const defaultMoveableOptions = (this.options as any).moveableOptions ?? {};
       const keepRatio = isImageElement(element) ? true : (defaultMoveableOptions.keepRatio ?? false);
-      this.moveableManager.enableFor(element,{ keepRatio });
+      if (!isTable) {
+        element.style.cursor = 'move';
+        this.moveableManager.enableFor(element,{ keepRatio });
+      }
     }
-    // 如果是同一个元素，检查是否需要重新启用编辑
-    if (element === lastSelectedElement) {
-      // 如果元素不再是 contenteditable，重新启用编辑
-      if (this.options.enableContentEditable && element.getAttribute('contenteditable') !== 'true') {
+
+    // 如果元素不再是 contenteditable，重新启用编辑
+    if (this.options.enableContentEditable && element.getAttribute('contenteditable') !== 'true') {
+      if (isTable) {
+        this.enableElementEditing(element);
+      }
+      // 如果是同一个元素，检查是否需要重新启用编辑
+      if (element === lastSelectedElement) {
         this.enableElementEditing(element);
       }
     }
+    
     const position = this.getBoundPostion(element);
     this.emit('elementSelect', element, position);
-    this.elementWatcher?.start(element, () => {
+    this.elementWatcher.start(element, () => {
       this.emit('styleChange', element);
-      this.moveableManager?.update();
+      this.moveableManager.update();
     });
     
     // 如果启用了 helperBox，则更新其位置
@@ -298,6 +320,20 @@ export class HTMLEditor {
     (element as any).__editHandlers = { handleInput, handleBlur,handleKeyDown};
   }
 
+  private removeEditListeners(element: HTMLElement): void {
+    const handlers = (element as any).__editHandlers;
+    if (!handlers) return;
+    const pairs: Array<[string, EventListener | undefined]> = [
+      ['input', handlers.handleInput],
+      ['blur', handlers.handleBlur],
+      ['keydown', handlers.handleKeyDown],
+    ];
+    for (const [type, fn] of pairs) {
+      if (fn) element.removeEventListener(type, fn as EventListener);
+    }
+    delete (element as any).__editHandlers;
+  }
+
   /**
    * 禁用元素编辑
    */
@@ -377,25 +413,16 @@ export class HTMLEditor {
     return element;
   }
 
-  private removeEditListeners(element: HTMLElement): void {
-    const handlers = (element as any).__editHandlers;
-    if (!handlers) return;
-    const pairs: Array<[string, EventListener | undefined]> = [
-      ['input', handlers.handleInput],
-      ['blur', handlers.handleBlur],
-      ['keydown', handlers.handleKeyDown],
-    ];
-    for (const [type, fn] of pairs) {
-      if (fn) element.removeEventListener(type, fn as EventListener);
-    }
-    delete (element as any).__editHandlers;
-  }
-
   clearSelection(): void {
     if (this.selectedElement) {
-      this.elementWatcher?.stop(this.selectedElement);
+      this.elementWatcher.stop(this.selectedElement);
       this.selectedElement.classList.remove('selected-element');
       this.selectedElement.removeAttribute('data-element-type');
+      if (this.selectedElement.getAttribute('original-display') === 'inline') {
+      // 如果元素是内联元素，设置为 inline-block，解决moveable无法拖拽的问题
+      this.selectedElement.style.display = 'inline';
+      this.selectedElement.removeAttribute('original-display');
+    }
       // 禁用编辑功能
       if (this.options.enableContentEditable) {
         this.disableElementEditing(this.selectedElement);

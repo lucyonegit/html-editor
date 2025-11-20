@@ -36,9 +36,22 @@ export function isDivWithImage(element: HTMLElement): boolean {
   return divWithbg
 }
 
+
+
 export function isBlockElement(element: HTMLElement): boolean {
-  const blockTags = ['div', 'section', 'article', 'header', 'footer', 'main', 'body', 'ol', 'ul','li','button'];
+  const blockTags = ['div', 'section', 'article', 'header', 'footer', 'main', 'body', 'ol', 'ul','li','button','i'];
   return blockTags.includes(element.tagName.toLowerCase()) && !isDivWithImage(element) && !isDivWithText(element);
+}
+
+export const isInlineElement = (element: HTMLElement): boolean => {
+  const display = getComputedStyle(element).display;
+  return display.startsWith('inline') && display !== 'inline-block';
+}
+
+export const isTableElement = (element: HTMLElement): boolean => {
+  const tableTags = ['tr', 'td', 'th', 'tbody', 'thead', 'tfoot', 'caption'];
+  const tagName = element.tagName.toLowerCase().toLowerCase();
+  return tableTags.includes(tagName);
 }
 
 export function isImageElement(element: HTMLElement): boolean {
@@ -65,10 +78,10 @@ export function createElement(type: string, content: string = ''): HTMLElement {
 }
 
 export const elementWatcher = ( editor: HTMLEditor) => {
-  let ele: HTMLElement | null = null;
+  let ele = null;
   let running = false;
-  let frameId: number | null = null;
-  let lastRect: Position | null = null;
+  let frameId = null;
+  let lastRect = null;
   const update = (element: HTMLElement, callback?:(postition: Position)=>void) => {
     if (!running || !element.isConnected) return;
 

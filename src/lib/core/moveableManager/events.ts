@@ -138,7 +138,7 @@ export class MoveableEventsHandler {
       if (originalTransform !== newTransform) {
         // 
         this.editor.historyManager?.beginBatch();
-        const command = createStyleChangeCommand(el, "transform", originalTransform || '', newTransform);
+        const command = createStyleChangeCommand(el, "transform", originalTransform, newTransform);
         command.execute();
         this.editor.historyManager?.push(command);
         const sizeCommand = createStyleChangeCommand(el, "width", originalSize.width, el.style.width);

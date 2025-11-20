@@ -36,7 +36,7 @@ export class HelperBoxManager {
     if(!this.element) return;
     this.element.style.width = `${position.width}px`;
     this.element.style.height = `${position.height}px`;
-    this.element.style.top = `${position.top + this.editor.container!.scrollTop || 0}px`;
+    this.element.style.top = `${position.top + this.editor.container.scrollTop}px`;
     this.element.style.left = `${position.left}px`;
   }
 
@@ -47,7 +47,7 @@ export class HelperBoxManager {
       start:(element: HTMLElement)=>{
         watcher.start(element, (postion) => {
           this.updatePostion(postion);
-          this.element?.setAttribute('data-element-type', element.getAttribute('data-element-type') || '')
+          this.element.setAttribute('data-element-type', element.getAttribute('data-element-type'))
         });
       },
       stop: watcher.stop,
