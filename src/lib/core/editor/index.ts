@@ -34,6 +34,7 @@ export class HTMLEditor {
   isResizing: boolean = false;
   isChangingBackground: boolean = false;
   isChangingColor: boolean = false;
+  isInsertMode: boolean = false;
   isIframe: boolean;
 
   constructor(options: HTMLEditorOptions) {
@@ -176,6 +177,7 @@ export class HTMLEditor {
 
   // 元素选择
   selectElement(element: HTMLElement): void {
+    if (this.isInsertMode) return;
     const lastSelectedElement = this.selectedElement;
     // 清除上一个选择
     this.clearSelection();
@@ -314,6 +316,65 @@ export class HTMLEditor {
     }
 
     this.removeEditListeners(element);
+  }
+
+  setInsertMode(value: boolean): void {
+    this.isInsertMode = value;
+    if (this.container) {
+      if (value) {
+        this.container.style.cursor = this.isIframe ? 'crosshair' : 'text';
+      } else {
+        this.container.style.cursor = '';
+      }
+      if (value) {
+        const doc = this.container.ownerDocument;
+        doc.querySelectorAll('.hover-highlight').forEach((el: Element) => {
+          (el as HTMLElement).classList.remove('hover-highlight');
+          (el as HTMLElement).removeAttribute('data-element-type');
+        });
+      }
+    }
+  }
+
+  enableInsertMode(): void {
+    this.EditorRegistry.enableInsertMode(this);
+  }
+
+  disableInsertMode(): void {
+    this.EditorRegistry.disableAllInsertMode();
+  }
+
+  insertTextAtPosition(clientX: number, clientY: number): HTMLElement | null {
+    if (!this.container) return null;
+    const rect = this.container.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+
+    const element = document.createElement('div');
+    element.textContent = '请输入文字';
+    element.style.position = 'absolute';
+    element.style.left = `${Math.max(0, Math.round(x))}px`;
+    element.style.top = `${Math.max(0, Math.round(y))}px`;
+    element.style.fontSize = '32px';
+    element.style.lineHeight = '1.2';
+    element.style.backgroundColor = 'transparent';
+    element.style.border = 'none';
+    element.style.padding = '0';
+    element.style.margin = '0';
+
+    if (this.historyManager) {
+      const command = createElementAddCommand(element, (this.selectedElement ?? this.container!) as HTMLElement, this.container!, null);
+      command.execute();
+      this.historyManager.push(command);
+    } else {
+      this.container.appendChild(element);
+    }
+
+    this.disableInsertMode();
+    this.selectElement(element);
+    // this.enableElementEditing(element);
+    this.emit('contentChange');
+    return element;
   }
 
   private removeEditListeners(element: HTMLElement): void {

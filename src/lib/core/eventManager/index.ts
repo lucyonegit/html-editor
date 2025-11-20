@@ -30,6 +30,9 @@ export class EventManager {
   bindHoverEvents(): void {
     const highlightTracker = this.editor.helperBoxManager?.createHighlightTracker();
     const handleMouseOver = (e: Event) => {
+      if (this.editor.isInsertMode) {
+        return;
+      }
       // 如果正在进行拖动、缩放等操作，不处理 hover
       if (this.editor.isOperating()) {
         return;
@@ -68,6 +71,9 @@ export class EventManager {
     };
 
     const handleMouseOut = (e: Event) => {
+      if (this.editor.isInsertMode) {
+        return;
+      }
       const target = e.target as HTMLElement;
       if (!target.classList.contains('selected-element')) {
         target.classList.remove('hover-highlight');
@@ -95,6 +101,13 @@ export class EventManager {
   bindClickEvents(): void {
     const handleClick = (e: Event) => {
       const target = e.target as HTMLElement;
+
+      if (this.editor.isInsertMode) {
+        e.stopPropagation();
+        const me = e as MouseEvent;
+        this.editor.insertTextAtPosition(me.clientX, me.clientY);
+        return;
+      }
 
       const targetTagName = target.tagName.toLowerCase();
       // 如果包含在忽略的标签中，不处理

@@ -7,7 +7,7 @@ const IframePage: React.FC = () => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [updatedSrcDoc, setUpdatedSrcDoc] = useState<string>('');
 
-  const { editor, selectedElement, position,canRedo,canUndo,undo,redo } = useIframeMode(iframeRef, {
+  const { editor, selectedElement, position,canRedo,canUndo,undo,redo, enableInsertMode } = useIframeMode(iframeRef, {
     onContentChange: (srcDoc: string) => {
       console.log('Iframe 内容已更新');
       setUpdatedSrcDoc(srcDoc);
@@ -18,7 +18,8 @@ const IframePage: React.FC = () => {
     <div style={styles.page}>
       <div style={styles.header}>
         <button onClick={undo} disabled={!canUndo} style={{marginRight: '8px'}}>撤销</button>
-        <button onClick={redo} disabled={!canRedo}>重做</button>
+        <button onClick={redo} disabled={!canRedo} style={{marginRight: '8px'}}>重做</button>
+        <button onClick={enableInsertMode}>添加文字</button>
         {/* <h2 style={styles.pageTitle}>Iframe 编辑器</h2>
         <p style={styles.description}>
           通过注入方式将编辑器注入到 iframe 中，实现对 iframe 内部元素的编辑。鼠标悬停高亮，点击选中后可进行编辑。

@@ -18,6 +18,7 @@ interface UseInjectModeReturn {
   undo: () => boolean;
   redo: () => boolean;
   clearHistory: () => void;
+  enableInsertMode: () => void;
 }
 
 const waitForIframeReady = (iframe: HTMLIFrameElement, timeout = 5000): Promise<void> => {
@@ -203,6 +204,7 @@ export function useIframeMode(
     undo: () => editorRef.current?.undo() ?? false,
     redo: () => editorRef.current?.redo() ?? false,
     clearHistory: () => editorRef.current?.clearHistory(),
+    enableInsertMode: () => editorRef.current?.enableInsertMode(),
   };
 }
 

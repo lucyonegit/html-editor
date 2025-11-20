@@ -20,6 +20,9 @@ export const EditorRegistry = {
     editors.forEach(ed => {
       if (ed !== current) {
         ed.clearSelection();
+        if (ed.isInsertMode) {
+          ed.disableInsertMode();
+        }
       }
     });
     lastActiveEditor = current;
@@ -79,6 +82,31 @@ export const EditorRegistry = {
   },
   canRedo(): boolean {
     return Array.from(editors).some(ed => ed.historyManager?.canRedo());
+  },
+
+  enableInsertMode(target: HTMLEditor): void {
+    editors.forEach(ed => {
+      if (ed === target) {
+        ed.setInsertMode(true);
+      } else if (ed.isInsertMode) {
+        ed.setInsertMode(false);
+      }
+    });
+    lastActiveEditor = target;
+  },
+
+  disableAllInsertMode(): void {
+    editors.forEach(ed => {
+      if (ed.isInsertMode) ed.setInsertMode(false);
+    });
+  },
+
+  isAnyInInsertMode(): boolean {
+    return Array.from(editors).some(ed => ed.isInsertMode);
+  },
+
+  getInsertModeEditors(): HTMLEditor[] {
+    return Array.from(editors).filter(ed => ed.isInsertMode);
   }
 };
 
