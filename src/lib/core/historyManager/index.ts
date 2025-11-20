@@ -203,6 +203,16 @@ export class HistoryManager {
     return this.redoStack.length;
   }
 
+  getTopUndoTimestamp(): number | null {
+    const cmd = this.undoStack[this.undoStack.length - 1];
+    return cmd ? cmd.timestamp : null;
+  }
+
+  getTopRedoTimestamp(): number | null {
+    const cmd = this.redoStack[this.redoStack.length - 1];
+    return cmd ? cmd.timestamp : null;
+  }
+
   /**
    * 通知状态变化
    */
