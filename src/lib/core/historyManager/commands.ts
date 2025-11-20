@@ -180,9 +180,10 @@ export function createContentChangeCommand(
   oldContent: string,
   newContent: string
 ): ContentChangeCommand {
+  const time = Date.now();
   return {
     type: OperationType.CONTENT_CHANGE,
-    timestamp: Date.now(),
+    timestamp: time,
     element,
     oldContent,
     newContent,
@@ -199,7 +200,7 @@ export function createContentChangeCommand(
       if (
         command.type === OperationType.CONTENT_CHANGE &&
         (command as ContentChangeCommand).element === element &&
-        Date.now() - command.timestamp < 2000
+        command.timestamp - time < 2000
       ) {
         this.newContent = (command as ContentChangeCommand).newContent;
         this.timestamp = command.timestamp;

@@ -6,7 +6,7 @@ import { EventManager } from '../eventManager'
 import StyleManager from '../styleManager';
 import { MoveableManager } from '../moveableManager';
 import { HistoryManager } from '../historyManager';
-import { createElementAddCommand, createElementDeleteCommand,createAttributeChangeCommand, createStyleChangeCommand } from '../historyManager/commands';
+import { createElementAddCommand, createElementDeleteCommand,createAttributeChangeCommand, createStyleChangeCommand, createContentChangeCommand } from '../historyManager/commands';
 import { defaultStyleConfig, generateEditorCSS } from '../../config/styles';
 import type { HTMLEditorOptions, Position, EditorStyleConfig } from '../../types';
 import { createElement, elementWatcher, getElementType, isImageElement } from '../utils';
@@ -231,11 +231,9 @@ export class HTMLEditor {
    * 启用元素编辑
    */
   enableElementEditing(element: HTMLElement): void {
-    // 如果已经有事件处理器，先移除避免重复绑定
     const existingHandlers = (element as any).__editHandlers;
     if (existingHandlers) {
-      element.removeEventListener('input', existingHandlers.handleInput);
-      element.removeEventListener('blur', existingHandlers.handleBlur);
+      this.removeEditListeners(element);
     }
 
     // 保存原始的contenteditable状态
@@ -250,8 +248,15 @@ export class HTMLEditor {
 
     element.focus();
 
-    // 监听内容变化
+    const initialContent = element.innerHTML;
+    let lastRecordedContent = initialContent;
     const handleInput = () => {
+      const newContent = element.innerHTML;
+      if (this.historyManager && newContent !== lastRecordedContent) {
+        const cmd = createContentChangeCommand(element, lastRecordedContent, newContent);
+        this.historyManager.push(cmd);
+        lastRecordedContent = newContent;
+      }
       this.emit('contentChange');
     };
 
@@ -263,8 +268,6 @@ export class HTMLEditor {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        // 插入换行符
-        // document.execCommand('insertHTML', false, '<br><br>');
         const selection = this.isIframe ? this.container!.ownerDocument.getSelection() : window.getSelection()
         if (!selection || !selection.rangeCount) return;
         const range = selection.getRangeAt(0);
@@ -275,6 +278,12 @@ export class HTMLEditor {
         range.collapse(true);
         selection.removeAllRanges();
         selection.addRange(range);
+        const newContent = element.innerHTML;
+        if (this.historyManager && newContent !== lastRecordedContent) {
+          const cmd = createContentChangeCommand(element, lastRecordedContent, newContent);
+          this.historyManager.push(cmd);
+          lastRecordedContent = newContent;
+        }
         this.emit('contentChange');
       }
     }
@@ -304,13 +313,21 @@ export class HTMLEditor {
       element.removeAttribute('contenteditable');
     }
 
-    // 移除事件监听器
+    this.removeEditListeners(element);
+  }
+
+  private removeEditListeners(element: HTMLElement): void {
     const handlers = (element as any).__editHandlers;
-    if (handlers) {
-      element.removeEventListener('input', handlers.handleInput);
-      element.removeEventListener('blur', handlers.handleBlur);
-      delete (element as any).__editHandlers;
+    if (!handlers) return;
+    const pairs: Array<[string, EventListener | undefined]> = [
+      ['input', handlers.handleInput],
+      ['blur', handlers.handleBlur],
+      ['keydown', handlers.handleKeyDown],
+    ];
+    for (const [type, fn] of pairs) {
+      if (fn) element.removeEventListener(type, fn as EventListener);
     }
+    delete (element as any).__editHandlers;
   }
 
   clearSelection(): void {
