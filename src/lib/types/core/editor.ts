@@ -26,6 +26,7 @@ export interface HTMLEditorOptions {
   autoSave?: boolean;
   styleConfig?: EditorStyleConfig;
   enableContentEditable?: boolean; // 是否启用contenteditable编辑
+  enableGlobalContentEditable?: boolean; // 是否启用全局contenteditable模式
   onElementSelect?: OnElementSelect | null;
   onStyleChange?: OnStyleChange | null;
   onContentChange?: OnContentChange | null;

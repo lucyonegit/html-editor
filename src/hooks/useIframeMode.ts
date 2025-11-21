@@ -82,6 +82,7 @@ export function useIframeMode(
   options?: UseInjectModeOptions
 ): UseInjectModeReturn {
   const editorRef = useRef<HTMLEditor | null>(null);
+  const [editorInst, setEditorInst] = useState<HTMLEditor | null>(null);
   const [selectedElement, setSelectedElement] = useState<HTMLElement | null>(null);
   const [position, setPosition] = useState<Position | null>(null);
   const [canUndo, setCanUndo] = useState(false);
@@ -154,6 +155,7 @@ export function useIframeMode(
     });
     editor.init(targetContainer);
     editorRef.current = editor;
+    setEditorInst(editor);
   };
 
   useEffect(() => {
@@ -195,7 +197,7 @@ export function useIframeMode(
   },[])
 
   return {
-    editor: editorRef.current,
+    editor: editorInst,
     selectedElement,
     position,
     injectScript,

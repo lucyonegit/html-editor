@@ -108,6 +108,15 @@ export const EditorRegistry = {
   getInsertModeEditors(): HTMLEditor[] {
     return Array.from(editors).filter(ed => ed.isInsertMode);
   }
+  ,
+  setGlobalContentEditable(enabled: boolean): void {
+    editors.forEach(ed => {
+      ed.setGlobalContentEditableEnabled(enabled);
+      if (enabled) {
+        ed.clearSelection();
+      }
+    });
+  }
 };
 
 export default EditorRegistry;

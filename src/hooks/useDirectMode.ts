@@ -16,6 +16,7 @@ export function useDirectMode(
   options?: UseDirectModeOptions
 ): UseDirectModeReturn {
   const editorRef = useRef<HTMLEditor | null>(null);
+  const [editorInst, setEditorInst] = useState<HTMLEditor | null>(null);
   const [selectedElement, setSelectedElement] = useState<HTMLElement | null>(null);
   const [position, setPosition] = useState<Position | null>(null);
 
@@ -61,18 +62,20 @@ export function useDirectMode(
     editor.init(targetContainer);
     console.log('初始化编辑器');
     editorRef.current = editor;
+    setEditorInst(editor);
 
     return () => {
       if (editorRef.current) {
         console.log('销毁编辑器');
         editorRef.current.destroy();
         editorRef.current = null;
+        setEditorInst(null);
       }
     };
   }, [containerRef, options?.styleConfig]);
 
   return {
-    editor: editorRef.current,
+    editor: editorInst,
     selectedElement,
     position
   };

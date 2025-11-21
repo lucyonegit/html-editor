@@ -5,7 +5,7 @@
 
 import { type HTMLEditor } from '../editor';
 import type { ElementStyles } from '../../types';
-import { createStyleChangeCommand, createElementTagChangeCommand } from '../historyManager/commands';
+import { createStyleChangeCommand, createElementTagChangeCommand, createContentChangeCommand } from '../historyManager/commands';
 
 export class StyleManager {
   private editor: HTMLEditor;
@@ -263,6 +263,19 @@ export class StyleManager {
 
     return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
   }
+
+  // =============================
+  // 选区样式操作（全局contenteditable模式）
+  // =============================
+  applySelectionBold(): boolean { return this.editor.globalEditable?.applySelectionBold() ?? false; }
+  applySelectionItalic(): boolean { return this.editor.globalEditable?.applySelectionItalic() ?? false; }
+  applySelectionUnderline(): boolean { return this.editor.globalEditable?.applySelectionUnderline() ?? false; }
+  applySelectionStrikeThrough(): boolean { return this.editor.globalEditable?.applySelectionStrikeThrough() ?? false; }
+  applySelectionFontSize(px: string): boolean { return this.editor.globalEditable?.applySelectionFontSize(px) ?? false; }
+  applySelectionFontFamily(name: string): boolean { return this.editor.globalEditable?.applySelectionFontFamily(name) ?? false; }
+  applySelectionColor(color: string): boolean { return this.editor.globalEditable?.applySelectionColor(color) ?? false; }
+  applySelectionBackground(color: string): boolean { return this.editor.globalEditable?.applySelectionBackground(color) ?? false; }
+  applySelectionAlign(align: 'left' | 'center' | 'right'): boolean { return this.editor.globalEditable?.applySelectionAlign(align as any) ?? false; }
 }
 
 export default StyleManager;

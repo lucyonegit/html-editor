@@ -29,6 +29,9 @@ export class EventManager {
   bindHoverEvents(): void {
     const highlightTracker = this.editor.helperBoxManager.createHighlightTracker();
     const handleMouseOver = (e: Event) => {
+      if (this.editor.globalEditable?.isEnabled()) {
+        return;
+      }
       if (this.editor.isInsertMode) {
         return;
       }
@@ -47,7 +50,7 @@ export class EventManager {
 
       // 先清除容器内所有非选中元素的hover样式
       if (this.editor.container) {
-        const doc = this.editor.container.ownerDocument;
+        const doc = this.editor.getDoc().document;
         doc.querySelectorAll('.hover-highlight').forEach((el: Element) => {
           if (!el.classList.contains('selected-element')) {
             el.classList.remove('hover-highlight');
@@ -70,6 +73,9 @@ export class EventManager {
     };
 
     const handleMouseOut = (e: Event) => {
+      if (this.editor.globalEditable?.isEnabled()) {
+        return;
+      }
       if (this.editor.isInsertMode) {
         return;
       }
@@ -99,6 +105,10 @@ export class EventManager {
 
   bindClickEvents(): void {
     const handleClick = (e: Event) => {
+      if (this.editor.globalEditable?.isEnabled()) {
+        // 在全局模式下不进行元素选择，让浏览器原生选择/caret工作
+        return;
+      }
       const target = e.target as HTMLElement;
       if (this.editor.isInsertMode) {
         e.stopPropagation();

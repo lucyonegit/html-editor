@@ -18,6 +18,7 @@ import type { HTMLEditorOptions, Position, EditorStyleConfig } from '../../types
 import { createElement, elementWatcher, getElementType, isImageElement, isInlineElement, isTableElement } from '../utils';
 import EditorRegistry from '../editorRegistry';
 import { HelperBoxManager } from '../helperBoxManager';
+import GlobalEditable from '../globalEditable';
 
 
 
@@ -34,6 +35,7 @@ export class HTMLEditor {
   container: HTMLElement | null;
   EditorRegistry: typeof EditorRegistry;
   elementWatcher: ReturnType<typeof elementWatcher>;
+  globalEditable: GlobalEditable | null;
 
   // 操作状态
   isDragging: boolean = false;
@@ -42,6 +44,9 @@ export class HTMLEditor {
   isInsertMode: boolean = false;
   isChangingColor: boolean = false;
   isIframe: boolean;
+  isGlobalContentEditable: boolean = false;
+  __globalEditHandlers: { handleInput?: (e: Event) => void; handleKeyDown?: (e: KeyboardEvent) => void } | null = null;
+  suppressBodyInputRecord: boolean = false;
 
   constructor(options: HTMLEditorOptions) {
     this.options = {
@@ -62,6 +67,7 @@ export class HTMLEditor {
       onReady: null,
       onHistoryChange: null,
       ignoreSelectTags: ['body', 'html'],
+      enableGlobalContentEditable: false,
       ...options
     };
 
@@ -94,6 +100,9 @@ export class HTMLEditor {
     this.container = null;
     this.EditorRegistry = EditorRegistry;
     this.isIframe = false;
+    this.isGlobalContentEditable = false as any;
+    this.__globalEditHandlers = null as any;
+    this.globalEditable = null;
   }
 
   init(container?: HTMLElement | string): void {
@@ -105,6 +114,7 @@ export class HTMLEditor {
     // 注册到全局编辑器注册表
     this.EditorRegistry.register(this);
     this.initializeManagers();
+    this.globalEditable = new GlobalEditable(this);
     this.bindEvents();
     this.elementWatcher = elementWatcher(this);
     if (this.options.helperBox) {
@@ -131,12 +141,21 @@ export class HTMLEditor {
     this.injectStyles();
   }
 
+  // 获取当前的window/document
+  getDoc() {
+    const container = this.container;
+    return {
+      view: container ? container.ownerDocument.defaultView : window,
+      document: container ? container.ownerDocument : document
+    }
+  }
+
   /**
    * 检查container是否是iframe中
    */
   detectIframe(): void {
     // 检查container是否在iframe中
-    if (this.container && this.container.ownerDocument !== document) {
+    if (this.container && this.getDoc().document !== document) {
       this.isIframe = true;
     }
   }
@@ -147,7 +166,7 @@ export class HTMLEditor {
   injectStyles(): void {
     if (!this.container) return;
 
-    const doc = this.container.ownerDocument;
+    const doc = this.getDoc().document;
     const styleId = 'html-editor-styles';
 
     // 检查是否已经注入过样式
@@ -184,9 +203,6 @@ export class HTMLEditor {
   selectElement(element: HTMLElement): void {
     if (this.isInsertMode) return;
     const lastSelectedElement = this.selectedElement;
-    if (lastSelectedElement) {
-      lastSelectedElement.style.cursor = 'pointer';
-    }
     // 清除上一个选择
     this.clearSelection();
 
@@ -292,7 +308,7 @@ export class HTMLEditor {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        const selection = this.isIframe ? this.container!.ownerDocument.getSelection() : window.getSelection()
+        const selection = this.isIframe ? this.getDoc().document.getSelection() : window.getSelection()
         if (!selection || !selection.rangeCount) return;
         const range = selection.getRangeAt(0);
         const br = document.createElement('br');
@@ -363,7 +379,7 @@ export class HTMLEditor {
         this.container.style.cursor = '';
       }
       if (value) {
-        const doc = this.container.ownerDocument;
+        const doc = this.getDoc().document;
         doc.querySelectorAll('.hover-highlight').forEach((el: Element) => {
           (el as HTMLElement).classList.remove('hover-highlight');
           (el as HTMLElement).removeAttribute('data-element-type');
@@ -430,6 +446,7 @@ export class HTMLEditor {
        // 销毁 moveable
       if (this.moveableManager) {
         this.moveableManager.destroy();
+        this.selectedElement.style.cursor = '';
       }
       this.selectedElement = null;
       this.emit('elementSelect', null);
@@ -441,7 +458,7 @@ export class HTMLEditor {
     });
      // 如果在iframe中，也清除iframe文档中的样式
     if (this.container) {
-      const ownerDoc = this.container.ownerDocument;
+      const ownerDoc = this.getDoc().document
       if (ownerDoc !== document) {
         ownerDoc.querySelectorAll('.hover-highlight').forEach(el => {
           el.classList.remove('hover-highlight');
@@ -457,6 +474,13 @@ export class HTMLEditor {
     if (this.options.helperBox && this.helperBoxManager) {
       this.helperBoxManager.visible(false);
     }
+  }
+
+  /**
+   * 开启/关闭全局 contenteditable 模式
+   */
+  setGlobalContentEditableEnabled(enabled: boolean): void {
+    this.globalEditable?.setEnabled(enabled);
   }
 
   // 样式应用

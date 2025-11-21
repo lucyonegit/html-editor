@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import ReactDomPage from './pages/react-dom';
 import IframePage from './pages/iframe';
+import ContentEditableDemo from './pages/contenteditable-demo';
 import './styles/global.css'
 
 const App: React.FC = () => {
@@ -14,6 +15,7 @@ const App: React.FC = () => {
           <div style={styles.links}>
             <Link to="/" style={styles.link}>React DOM Editor</Link>
             <Link to="/iframe" style={styles.link}>Iframe Editor</Link>
+            <Link to="/contenteditable-demo" style={styles.link}>Contenteditable Demo</Link>
           </div>
         </nav>
 
@@ -21,6 +23,7 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<ReactDomPage />} />
             <Route path="/iframe" element={<IframePage />} />
+            <Route path="/contenteditable-demo" element={<ContentEditableDemo />} />
           </Routes>
         </div>
       </div>
