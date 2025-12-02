@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useIframeMode } from '../hooks/useIframeMode';
 import Tooltip from '../components/tooltip';
 import { paperContent } from './paper';
+import { useSelectionFormatting } from '../hooks/useSelectionFormatting';
 
 const ContentEditableDemo: React.FC = () => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -18,6 +19,16 @@ const ContentEditableDemo: React.FC = () => {
   }, [editor, globalOn]);
 
   const gm = editor?.globalEditable as any;
+  const fmt = useSelectionFormatting(globalOn ? editor : null);
+
+  useEffect(() => {
+    if (!globalOn) return;
+    if (!fmt) return;
+    if (fmt.fontFamily) setFontName(fmt.fontFamily);
+    if (fmt.fontSize) setFontSize(fmt.fontSize);
+    if (fmt.color) setColor(fmt.color);
+    if (fmt.backgroundColor) setBg(fmt.backgroundColor);
+  }, [fmt, globalOn]);
 
   return (
     <div style={styles.page}>
@@ -55,10 +66,10 @@ const ContentEditableDemo: React.FC = () => {
           />
         </div>
         <div style={{ marginLeft: 8 }}>
-          <button style={styles.iconBtn} onClick={() => (globalOn ? gm?.applySelectionBold() : editor?.styleManager?.changeFontWeight(selectedElement, 'bold'))}>B</button>
-          <button style={styles.iconBtn} onClick={() => (globalOn ? gm?.applySelectionItalic() : editor?.styleManager?.changeFontStyle(selectedElement, 'italic'))}>I</button>
-          <button style={styles.iconBtn} onClick={() => (globalOn ? gm?.applySelectionUnderline() : editor?.styleManager?.changeTextDecoration(selectedElement, 'underline'))}>U</button>
-          <button style={styles.iconBtn} onClick={() => (globalOn ? gm?.applySelectionStrikeThrough() : editor?.styleManager?.changeTextDecoration(selectedElement, 'line-through'))}>S</button>
+          <button style={{...styles.iconBtn, background: (!fmt.collapsed && fmt.isBold) ? '#e6f4ff' : '#fff'}} onClick={() => (globalOn ? gm?.applySelectionBold() : editor?.styleManager?.changeFontWeight(selectedElement, 'bold'))}>B</button>
+          <button style={{...styles.iconBtn, background: (!fmt.collapsed && fmt.isItalic) ? '#e6f4ff' : '#fff'}} onClick={() => (globalOn ? gm?.applySelectionItalic() : editor?.styleManager?.changeFontStyle(selectedElement, 'italic'))}>I</button>
+          <button style={{...styles.iconBtn, background: (!fmt.collapsed && fmt.isUnderline) ? '#e6f4ff' : '#fff'}} onClick={() => (globalOn ? gm?.applySelectionUnderline() : editor?.styleManager?.changeTextDecoration(selectedElement, 'underline'))}>U</button>
+          <button style={{...styles.iconBtn, background: (!fmt.collapsed && fmt.isStrikeThrough) ? '#e6f4ff' : '#fff'}} onClick={() => (globalOn ? gm?.applySelectionStrikeThrough() : editor?.styleManager?.changeTextDecoration(selectedElement, 'line-through'))}>S</button>
         </div>
         <div style={{ marginLeft: 8 }}>
           <input type="color" value={color} onChange={(e) => { setColor(e.target.value); globalOn ? gm?.applySelectionColor(e.target.value) : editor?.styleManager?.changeColor(selectedElement, e.target.value); }} />
@@ -67,9 +78,9 @@ const ContentEditableDemo: React.FC = () => {
           <input type="color" value={bg} onChange={(e) => { setBg(e.target.value); globalOn ? gm?.applySelectionBackground(e.target.value) : editor?.styleManager?.changeBackground(selectedElement, e.target.value); }} />
         </div>
         <div style={{ marginLeft: 8 }}>
-          <button style={styles.iconBtn} onClick={() => (globalOn ? gm?.applySelectionAlign('left') : editor?.styleManager?.changeTextAlign(selectedElement, 'left'))}>左</button>
-          <button style={styles.iconBtn} onClick={() => (globalOn ? gm?.applySelectionAlign('center') : editor?.styleManager?.changeTextAlign(selectedElement, 'center'))}>中</button>
-          <button style={styles.iconBtn} onClick={() => (globalOn ? gm?.applySelectionAlign('right') : editor?.styleManager?.changeTextAlign(selectedElement, 'right'))}>右</button>
+          <button style={{...styles.iconBtn, background: (!fmt.collapsed && fmt.textAlign==='left')?'#e6f4ff':'#fff'}} onClick={() => (globalOn ? gm?.applySelectionAlign('left') : editor?.styleManager?.changeTextAlign(selectedElement, 'left'))}>左</button>
+          <button style={{...styles.iconBtn, background: (!fmt.collapsed && fmt.textAlign==='center')?'#e6f4ff':'#fff'}} onClick={() => (globalOn ? gm?.applySelectionAlign('center') : editor?.styleManager?.changeTextAlign(selectedElement, 'center'))}>中</button>
+          <button style={{...styles.iconBtn, background: (!fmt.collapsed && fmt.textAlign==='right')?'#e6f4ff':'#fff'}} onClick={() => (globalOn ? gm?.applySelectionAlign('right') : editor?.styleManager?.changeTextAlign(selectedElement, 'right'))}>右</button>
         </div>
         <div style={{ marginLeft: 'auto' }}>
           <button style={styles.iconBtn} onClick={undo} disabled={!canUndo}>撤销</button>
