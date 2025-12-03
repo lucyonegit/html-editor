@@ -1,7 +1,7 @@
 import { HTMLEditor } from '../editor';
 import { createContentChangeCommand } from '../historyManager/commands';
-import { MarkEngine } from '../markEngine';
-import type { MarkSpec, MarkType } from '../markEngine';
+import { MarkEngine } from './markEngine';
+import type { MarkSpec, MarkType } from './markEngine';
 
 export class GlobalEditable {
   private editor: HTMLEditor;
