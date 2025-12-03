@@ -317,63 +317,35 @@ const normalizeNestedSpans = (ctx: DocCtx, container: Node): void => {
 
 // ==================== 选区包裹操作 ====================
 
-/** 用 span 包裹选区并应用样式 */
-const surroundSelection = (
-  ctx: DocCtx, 
+const surroundRange = (
+  ctx: DocCtx,
+  range: Range,
   styles: Record<string, string>
 ): HTMLElement | null => {
-  if (isCollapsed(ctx)) return null
-  
-  const range = getRange(ctx)
-  if (!range) return null
-  
-  // 检查是否在同一块级元素内
-  if (!isWithinSameBlock(ctx, range)) {
-    console.warn('不支持跨块级元素的格式化')
-    return null
-  }
-  
+  if (range.collapsed) return null
+  if (!isWithinSameBlock(ctx, range)) return null
   const existing = commonSpanForRange(ctx, range)
-  
-  // 如果选区完全覆盖已有 span，直接修改该 span
   if (existing && coversNode(ctx, range, existing)) {
     Object.entries(styles).forEach(([prop, value]) => {
-      if (value) {
-        existing.style.setProperty(prop, value)
-      } else {
-        existing.style.removeProperty(prop)
-      }
+      if (value) existing.style.setProperty(prop, value)
+      else existing.style.removeProperty(prop)
     })
-    
     const newRange = ctx.document.createRange()
     newRange.selectNodeContents(existing)
     setRange(ctx, newRange)
-    
     return existing
   }
-  
-  // 创建新 span
   const span = ctx.document.createElement('span')
   Object.entries(styles).forEach(([prop, value]) => {
-    if (value) {
-      span.style.setProperty(prop, value)
-    }
+    if (value) span.style.setProperty(prop, value)
   })
-  
-  // 提取内容并包裹
   const fragment = range.extractContents()
-  
-  // 规范化嵌套
   normalizeNestedSpans(ctx, fragment)
-  
   span.appendChild(fragment)
   range.insertNode(span)
-  
-  // 恢复选区
   const newRange = ctx.document.createRange()
   newRange.selectNodeContents(span)
   setRange(ctx, newRange)
-  
   return span
 }
 
@@ -565,25 +537,38 @@ export class MarkEngine {
     const range = getRange(this.ctx)
     if (!range) return false
     
-    // 检查是否在同一块级元素内
-    if (!isWithinSameBlock(this.ctx, range)) {
-      return false
-    }
+    const withinSame = isWithinSameBlock(this.ctx, range)
     
     // 清除样式缓存
     this.styleCache.clear()
     
-    // 根据不同类型执行不同逻辑
-    if (spec.type === 'underline' || spec.type === 'strike') {
-      return this.toggleDecoration(spec, range)
+    if (withinSame) {
+      if (spec.type === 'underline' || spec.type === 'strike') {
+        return this.toggleDecoration(spec, range)
+      }
+      if (spec.type === 'bold' || spec.type === 'italic') {
+        return this.toggleFontStyle(spec, range)
+      }
+      return this.applyStyle(spec, range)
+    } else {
+      if (spec.type === 'underline' || spec.type === 'strike') {
+        return this.toggleDecorationAcrossBlocks(spec, range)
+      }
+      if (spec.type === 'bold' || spec.type === 'italic') {
+        return this.toggleFontStyleAcrossBlocks(spec, range)
+      }
+      const segments = this.collectBlockSubRanges(range)
+      const styles = styleMap[spec.type](spec.value)
+      let applied = false
+      segments.forEach(r => {
+        const created = surroundRange(this.ctx, r, styles)
+        if (created) {
+          mergeAdjacentSpans(this.ctx, created)
+          applied = true
+        }
+      })
+      return applied
     }
-    
-    if (spec.type === 'bold' || spec.type === 'italic') {
-      return this.toggleFontStyle(spec, range)
-    }
-    
-    // 其他样式：直接应用
-    return this.applyStyle(spec, range)
   }
   
   /**
@@ -594,8 +579,9 @@ export class MarkEngine {
 
     let targetSpan = commonSpanForRange(this.ctx, range)
     if (!targetSpan) {
-      targetSpan = surroundSelection(this.ctx, {})
-      if (!targetSpan) return false
+      const created = surroundRange(this.ctx, range, {})
+      if (!created) return false
+      targetSpan = created
     }
 
     const currentTokens = getDecoTokens(this.ctx, targetSpan)
@@ -603,7 +589,7 @@ export class MarkEngine {
     const fullyCovered = coversNode(this.ctx, range, targetSpan)
 
     if (!isActive && !fullyCovered) {
-      const selSpan = surroundSelection(this.ctx, {})
+      const selSpan = surroundRange(this.ctx, range, {})
       if (!selSpan) return false
       const newTokens = new Set(currentTokens)
       newTokens.add(decoType)
@@ -650,8 +636,9 @@ export class MarkEngine {
     // 先尝试创建或获取包裹 span
     let targetSpan = commonSpanForRange(this.ctx, range)
     if (!targetSpan) {
-      targetSpan = surroundSelection(this.ctx, {})
-      if (!targetSpan) return false
+      const created = surroundRange(this.ctx, range, {})
+      if (!created) return false
+      targetSpan = created
     }
     
     const isActive = isBold 
@@ -672,13 +659,170 @@ export class MarkEngine {
     mergeAdjacentSpans(this.ctx, targetSpan)
     return true
   }
+
+  private collectBlockSubRanges(range: Range): Range[] {
+    const startEl = getContainerElement(range.startContainer)
+    const endEl = getContainerElement(range.endContainer)
+    const startBlock = ascendToBlockByStyle(this.ctx, startEl)
+    const endBlock = ascendToBlockByStyle(this.ctx, endEl)
+    if (!startBlock || !endBlock) return [range.cloneRange()]
+    if (startBlock === endBlock) return [range.cloneRange()]
+    const ranges: Range[] = []
+    const first = this.ctx.document.createRange()
+    first.setStart(range.startContainer, range.startOffset)
+    first.setEnd(startBlock, startBlock.childNodes.length)
+    ranges.push(first)
+    const walker = this.ctx.document.createTreeWalker(
+      this.ctx.document.body,
+      NodeFilter.SHOW_ELEMENT,
+      {
+        acceptNode: (node) => {
+          const el = node as HTMLElement
+          const display = this.ctx.view.getComputedStyle(el).display
+          return display !== 'inline' ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP
+        }
+      }
+    )
+    ;(walker as any).currentNode = startBlock
+    let node: Node | null
+    while ((node = walker.nextNode())) {
+      if (node === endBlock) break
+      const mid = this.ctx.document.createRange()
+      mid.selectNodeContents(node as Element)
+      ranges.push(mid)
+    }
+    const last = this.ctx.document.createRange()
+    last.setStart(endBlock, 0)
+    last.setEnd(range.endContainer, range.endOffset)
+    ranges.push(last)
+    return ranges
+  }
+
+  private isRangeActiveDeco(range: Range, deco: 'underline' | 'line-through'): boolean {
+    const span = commonSpanForRange(this.ctx, range)
+    if (!span) return false
+    if (!coversNode(this.ctx, range, span)) return false
+    const tokens = getDecoTokens(this.ctx, span)
+    return tokens.has(deco)
+  }
+
+  private isRangeActiveFont(range: Range, isBold: boolean): boolean {
+    const span = commonSpanForRange(this.ctx, range)
+    if (!span) return false
+    if (!coversNode(this.ctx, range, span)) return false
+    return isBold ? isComputedBold(this.ctx, span) : isComputedItalic(this.ctx, span)
+  }
+
+  private toggleDecorationAcrossBlocks(spec: MarkSpec, range: Range): boolean {
+    this.normalizeInlineTagsInRange(range)
+    const deco = spec.type === 'underline' ? 'underline' : 'line-through'
+    const segments = this.collectBlockSubRanges(range)
+    const activeAll = segments.length > 0 && segments.every(r => this.isRangeActiveDeco(r, deco))
+    if (activeAll) {
+      segments.forEach(r => {
+        const span = commonSpanForRange(this.ctx, r)
+        if (span && coversNode(this.ctx, r, span)) {
+          splitRemoveDeco(this.ctx, r, span, deco)
+        }
+      })
+      return true
+    }
+    segments.forEach(r => {
+      let span = commonSpanForRange(this.ctx, r)
+      if (span && coversNode(this.ctx, r, span)) {
+        const tokens = getDecoTokens(this.ctx, span)
+        const newTokens = new Set(tokens)
+        newTokens.add(deco)
+        const str = Array.from(newTokens).join(' ')
+        span.style.textDecoration = str
+        mergeAdjacentSpans(this.ctx, span)
+      } else {
+        const created = surroundRange(this.ctx, r, {})
+        if (created) {
+          const tokens = getDecoTokens(this.ctx, created)
+          const newTokens = new Set(tokens)
+          newTokens.add(deco)
+          const str = Array.from(newTokens).join(' ')
+          created.style.textDecoration = str
+          mergeAdjacentSpans(this.ctx, created)
+        }
+      }
+    })
+    return true
+  }
+
+  private toggleFontStyleAcrossBlocks(spec: MarkSpec, range: Range): boolean {
+    this.normalizeInlineTagsInRange(range)
+    const isBold = spec.type === 'bold'
+    const property = isBold ? 'font-weight' : 'font-style'
+    const activeValue = isBold ? 'bold' : 'italic'
+    const inactiveValue = 'normal'
+    const segments = this.collectBlockSubRanges(range)
+    const activeAll = segments.length > 0 && segments.every(r => this.isRangeActiveFont(r, isBold))
+    if (activeAll) {
+      segments.forEach(r => {
+        const span = commonSpanForRange(this.ctx, r)
+        if (span && coversNode(this.ctx, r, span)) {
+          splitRemoveStyle(this.ctx, r, span, property, inactiveValue)
+        }
+      })
+      return true
+    }
+    segments.forEach(r => {
+      let span = commonSpanForRange(this.ctx, r)
+      if (span && coversNode(this.ctx, r, span)) {
+        span.style.setProperty(property, activeValue)
+        mergeAdjacentSpans(this.ctx, span)
+      } else {
+        const created = surroundRange(this.ctx, r, {})
+        if (created) {
+          created.style.setProperty(property, activeValue)
+          mergeAdjacentSpans(this.ctx, created)
+        }
+      }
+    })
+    return true
+  }
+
+  private normalizeInlineTagsInRange(range: Range): void {
+    const body = this.ctx.document.body
+    const walker = this.ctx.document.createTreeWalker(body, NodeFilter.SHOW_ELEMENT)
+    let node: Node | null
+    const map: Record<string, { prop: string, value: string }> = {
+      B: { prop: 'font-weight', value: 'bold' },
+      STRONG: { prop: 'font-weight', value: 'bold' },
+      I: { prop: 'font-style', value: 'italic' },
+      EM: { prop: 'font-style', value: 'italic' },
+      U: { prop: 'text-decoration', value: 'underline' },
+      S: { prop: 'text-decoration', value: 'line-through' },
+      STRIKE: { prop: 'text-decoration', value: 'line-through' }
+    }
+    while ((node = walker.nextNode())) {
+      const el = node as HTMLElement
+      const tag = el.tagName
+      if (!map[tag]) continue
+      const inter = (range as any).intersectsNode ? (range as any).intersectsNode(el) : true
+      if (!inter) continue
+      const span = this.ctx.document.createElement('span')
+      const styleAttr = el.getAttribute('style') || ''
+      if (styleAttr) span.setAttribute('style', styleAttr)
+      span.style.setProperty(map[tag].prop, map[tag].value)
+      while (el.firstChild) span.appendChild(el.firstChild)
+      el.parentNode?.replaceChild(span, el)
+    }
+  }
   
   /**
    * 应用普通样式（颜色、字号等）
    */
   private applyStyle(spec: MarkSpec, range: Range): boolean {
     const styles = styleMap[spec.type](spec.value)
-    const target = surroundSelection(this.ctx, styles)
+    const target = (() => {
+      const r = this.ctx.document.createRange()
+      r.setStart(range.startContainer, range.startOffset)
+      r.setEnd(range.endContainer, range.endOffset)
+      return surroundRange(this.ctx, r, styles)
+    })()
     
     if (!target) return false
     
