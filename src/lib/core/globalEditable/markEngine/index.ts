@@ -591,40 +591,49 @@ export class MarkEngine {
    */
   private toggleDecoration(spec: MarkSpec, range: Range): boolean {
     const decoType = spec.type === 'underline' ? 'underline' : 'line-through'
-    
-    // 先尝试创建或获取包裹 span
+
     let targetSpan = commonSpanForRange(this.ctx, range)
     if (!targetSpan) {
       targetSpan = surroundSelection(this.ctx, {})
       if (!targetSpan) return false
     }
-    
+
     const currentTokens = getDecoTokens(this.ctx, targetSpan)
     const isActive = currentTokens.has(decoType)
     const fullyCovered = coversNode(this.ctx, range, targetSpan)
-    
-    // 情况1：已激活且是局部选区 → 局部移除
+
+    if (!isActive && !fullyCovered) {
+      const selSpan = surroundSelection(this.ctx, {})
+      if (!selSpan) return false
+      const newTokens = new Set(currentTokens)
+      newTokens.add(decoType)
+      const decoStr = Array.from(newTokens).join(' ')
+      if (decoStr) {
+        selSpan.style.textDecoration = decoStr
+      } else {
+        selSpan.style.removeProperty('text-decoration')
+      }
+      mergeAdjacentSpans(this.ctx, selSpan)
+      return true
+    }
+
     if (isActive && !fullyCovered) {
       splitRemoveDeco(this.ctx, range, targetSpan, decoType)
       return true
     }
-    
-    // 情况2：切换整个 span 的状态
+
     const newTokens = new Set(currentTokens)
     if (newTokens.has(decoType)) {
       newTokens.delete(decoType)
     } else {
       newTokens.add(decoType)
     }
-    
-    // 应用新的装饰
     const decoStr = Array.from(newTokens).join(' ')
     if (decoStr) {
       targetSpan.style.textDecoration = decoStr
     } else {
       targetSpan.style.removeProperty('text-decoration')
     }
-    
     mergeAdjacentSpans(this.ctx, targetSpan)
     return true
   }
