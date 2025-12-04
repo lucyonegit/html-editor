@@ -359,17 +359,108 @@ export class MarkEngine {
    */
   private applyStyle(spec: MarkSpec): boolean {
     const styles = styleMap[spec.type](spec.value)
-    const target = surroundSelection(this.ctx, styles)
-    
-    if (!target) return false
-    
-    // 如果是链接类型，添加额外属性
-    if (spec.type === 'link' && spec.attrs?.href) {
-      target.setAttribute('data-href', spec.attrs.href)
-      target.style.cursor = 'pointer'
+    const range = getRange(this.ctx)
+    if (!range) return false
+
+    const normalized = normalizeRangeBoundaries(this.ctx, range)
+
+    let targetSpan = commonSpanForRange(this.ctx, normalized)
+
+    if (!targetSpan) {
+      const created = surroundSelection(this.ctx, styles)
+      if (!created) return false
+      if (spec.type === 'link' && spec.attrs?.href) {
+        created.setAttribute('data-href', spec.attrs.href)
+        created.style.cursor = 'pointer'
+      }
+      // 合并子元素
+      mergeAdjacentSpans(created)
+       //清空所有子元素的样式，只应用父节点的样式
+      Array.from(created.children).forEach(child => {
+        child.removeAttribute('style')
+      })
+      return true
     }
 
-    mergeAdjacentSpans(target)
+    const fullyCovered = coversNode(this.ctx, normalized, targetSpan)
+
+    if (fullyCovered) {
+      Object.entries(styles).forEach(([prop, value]) => {
+        if (value) {
+          targetSpan.style.setProperty(prop, value)
+        } else {
+          targetSpan.style.removeProperty(prop)
+        }
+      })
+      if (spec.type === 'link' && spec.attrs?.href) {
+        targetSpan.setAttribute('data-href', spec.attrs.href)
+        targetSpan.style.cursor = 'pointer'
+      }
+      mergeAdjacentSpans(targetSpan)
+      const newRange = this.ctx.document.createRange()
+      newRange.selectNodeContents(targetSpan)
+      setRange(this.ctx, newRange)
+      return true
+    }
+    
+
+    const split = splitElementByRange(this.ctx, normalized, targetSpan)
+    const parent = targetSpan.parentNode!
+    const sequence: Node[] = []
+
+    if (!isFragmentEmpty(split.pre)) {
+      const preSpan = cloneSpanWithStyle(this.ctx, targetSpan, {})
+      preSpan.appendChild(split.pre)
+      sequence.push(preSpan)
+    }
+
+    const midSpan = cloneSpanWithStyle(this.ctx, targetSpan, {})
+    Object.entries(styles).forEach(([prop, value]) => {
+      if (value) {
+        midSpan.style.setProperty(prop, value)
+      } else {
+        midSpan.style.removeProperty(prop)
+      }
+    })
+    if (spec.type === 'link' && spec.attrs?.href) {
+      midSpan.setAttribute('data-href', spec.attrs.href)
+      midSpan.style.cursor = 'pointer'
+    }
+    let midNode: Node
+    const hasStyle = (midSpan.getAttribute('style') || '').trim()
+    if (hasStyle) {
+      midSpan.appendChild(split.mid)
+      midNode = midSpan
+    } else {
+      midNode = split.mid
+    }
+    sequence.push(midNode)
+
+    if (!isFragmentEmpty(split.post)) {
+      const postSpan = cloneSpanWithStyle(this.ctx, targetSpan, {})
+      postSpan.appendChild(split.post)
+      sequence.push(postSpan)
+    }
+
+    sequence.forEach(node => parent.insertBefore(node, targetSpan))
+    parent.removeChild(targetSpan)
+
+    if (midNode.nodeType === Node.ELEMENT_NODE) {
+      mergeAdjacentSpans(midNode as HTMLElement)
+    }
+
+    const newRange = this.ctx.document.createRange()
+    if (midNode.nodeType === Node.ELEMENT_NODE) {
+      newRange.selectNodeContents(midNode as Element)
+    } else if (midNode.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+      const firstChild = (midNode as DocumentFragment).firstChild
+      const lastChild = (midNode as DocumentFragment).lastChild
+      if (firstChild && lastChild) {
+        newRange.setStartBefore(firstChild)
+        newRange.setEndAfter(lastChild)
+      }
+    }
+    setRange(this.ctx, newRange)
     return true
   }
   
