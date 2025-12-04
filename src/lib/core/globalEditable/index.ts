@@ -1,7 +1,7 @@
 import { HTMLEditor } from '../editor';
 import { createContentChangeCommand } from '../historyManager/commands';
 import { MarkEngine } from './markEngine';
-import type { MarkSpec, MarkType } from './markEngine';
+import type { MarkSpec, MarkType } from './markEngine/type';
 
 export class GlobalEditable {
   private editor: HTMLEditor;
@@ -214,6 +214,7 @@ export class GlobalEditable {
       const newRange = ctx.document.createRange();
       newRange.setStart(span.firstChild as Text, 1);
       newRange.collapse(true);
+      if(!sel) return false;
       sel.removeAllRanges();
       sel.addRange(newRange);
     };
