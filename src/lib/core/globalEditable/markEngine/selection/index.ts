@@ -1,16 +1,27 @@
-import { ascendToSpan, getContainerElement } from "../dom"
 import { DocCtx } from "../type"
 
 /** 检查 Range 是否在同一个 span 内 */
 export const commonSpanForRange = (ctx: DocCtx, range: Range): HTMLElement | null => {
-  const startEl = getContainerElement(range.startContainer)
-  const endEl = getContainerElement(range.endContainer)
-  
-  const startSpan = ascendToSpan(startEl)
-  const endSpan = ascendToSpan(endEl)
-  debugger
-  
-  if (startSpan && startSpan === endSpan) return startSpan
+  void ctx
+  const collectAncestorSpans = (node: Node): HTMLElement[] => {
+    const spans: HTMLElement[] = []
+    let cur: Node | null = node
+    if (cur.nodeType === Node.TEXT_NODE) cur = cur.parentNode
+    while (cur && cur.nodeType === Node.ELEMENT_NODE) {
+      const el = cur as HTMLElement
+      if (el.tagName === 'SPAN') spans.push(el)
+      cur = el.parentNode
+    }
+    return spans
+  }
+
+  const startSpans = collectAncestorSpans(range.startContainer)
+  const endSpans = collectAncestorSpans(range.endContainer)
+
+  for (let i = 0; i < startSpans.length; i++) {
+    const candidate = startSpans[i]
+    if (endSpans.includes(candidate)) return candidate
+  }
   return null
 }
 
@@ -44,4 +55,25 @@ export const coversNode = (ctx: DocCtx, range: Range, node: HTMLElement): boolea
     range.compareBoundaryPoints(Range.START_TO_START, testRange) <= 0 &&
     range.compareBoundaryPoints(Range.END_TO_END, testRange) >= 0
   )
+}
+
+export const normalizeRangeBoundaries = (ctx: DocCtx, range: Range): Range => {
+  const normalizeBoundary = (container: Node, offset: number, isStart: boolean): { container: Node, offset: number } => {
+    if (container.nodeType === Node.TEXT_NODE) {
+      const text = container as Text
+      if (offset <= 0) return { container: text, offset: 0 }
+      if (offset >= text.length) return { container: text, offset: text.length }
+      const right = text.splitText(offset)
+      return isStart ? { container: right, offset: 0 } : { container: text, offset: text.length }
+    }
+    return { container, offset }
+  }
+
+  const s = normalizeBoundary(range.startContainer, range.startOffset, true)
+  const e = normalizeBoundary(range.endContainer, range.endOffset, false)
+  const newRange = ctx.document.createRange()
+  newRange.setStart(s.container, s.offset)
+  newRange.setEnd(e.container, e.offset)
+  setRange(ctx, newRange)
+  return newRange
 }

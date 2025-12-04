@@ -1,4 +1,4 @@
-import { commonSpanForRange, coversNode, getRange, isCollapsed, setRange } from "../selection"
+import { commonSpanForRange, coversNode, getRange, isCollapsed, normalizeRangeBoundaries, setRange } from "../selection"
 import { DocCtx, SplitResult } from "../type"
 
 /** 检查 fragment 是否为空（无文本内容） */
@@ -93,6 +93,7 @@ export const surroundSelection = (
   
   const range = getRange(ctx)
   if (!range) return null
+  const normalized = normalizeRangeBoundaries(ctx, range)
   
   // 检查是否在同一块级元素内
   if (!isWithinSameBlock(ctx, range)) {
@@ -100,10 +101,10 @@ export const surroundSelection = (
     return null
   }
   
-  const existing = commonSpanForRange(ctx, range)
+  const existing = commonSpanForRange(ctx, normalized)
   
   // 如果选区完全覆盖已有 span，直接修改该 span
-  if (existing && coversNode(ctx, range, existing)) {
+  if (existing && coversNode(ctx, normalized, existing)) {
     Object.entries(styles).forEach(([prop, value]) => {
       if (value) {
         existing.style.setProperty(prop, value)
@@ -128,13 +129,13 @@ export const surroundSelection = (
   })
   
   // 提取内容并包裹
-  const fragment = range.extractContents()
+  const fragment = normalized.extractContents()
   
   // 规范化嵌套
   normalizeNestedSpans(ctx, fragment)
   
   span.appendChild(fragment)
-  range.insertNode(span)
+  normalized.insertNode(span)
 
   // 恢复选区
   const newRange = ctx.document.createRange()
@@ -188,14 +189,11 @@ export const cloneSpanWithStyle = (
 /** 合并相邻且样式相同的 span 元素 */
 export const mergeAdjacentSpans = (el: HTMLElement): void => {
   const targetStyle = el.getAttribute('style')
-  // 向前合并
   let prev = el.previousSibling
   while (prev && prev.nodeType === Node.ELEMENT_NODE) {
     const prevEl = prev as HTMLElement
     if (prevEl.tagName === 'SPAN' && prevEl.getAttribute('style') === targetStyle) {
-      while (prevEl.firstChild) {
-        el.insertBefore(prevEl.firstChild, el.firstChild)
-      }
+      while (prevEl.firstChild) el.insertBefore(prevEl.firstChild, el.firstChild)
       const toRemove = prevEl
       prev = prevEl.previousSibling
       toRemove.remove()
@@ -203,15 +201,11 @@ export const mergeAdjacentSpans = (el: HTMLElement): void => {
       break
     }
   }
-  
-  // 向后合并
   let next = el.nextSibling
   while (next && next.nodeType === Node.ELEMENT_NODE) {
     const nextEl = next as HTMLElement
     if (nextEl.tagName === 'SPAN' && nextEl.getAttribute('style') === targetStyle) {
-      while (nextEl.firstChild) {
-        el.appendChild(nextEl.firstChild)
-      }
+      while (nextEl.firstChild) el.appendChild(nextEl.firstChild)
       const toRemove = nextEl
       next = nextEl.nextSibling
       toRemove.remove()
@@ -219,6 +213,40 @@ export const mergeAdjacentSpans = (el: HTMLElement): void => {
       break
     }
   }
+
+  const doc = el.ownerDocument
+  const cleanup = (root: Node) => {
+    const walker = doc.createTreeWalker(root, NodeFilter.SHOW_ELEMENT)
+    const toUnwrap: HTMLElement[] = []
+    const toFlatten: HTMLElement[] = []
+    let node: Node | null
+    while ((node = walker.nextNode())) {
+      const cur = node as HTMLElement
+      if (cur.tagName !== 'SPAN') continue
+      if (!cur.firstChild) { cur.remove(); continue }
+      const styleAttr = (cur.getAttribute('style') || '').trim()
+      if (!styleAttr && !cur.hasAttribute('data-href')) toUnwrap.push(cur)
+      const children = Array.from(cur.children)
+      children.forEach(ch => {
+        const cel = ch as HTMLElement
+        if (cel.tagName === 'SPAN' && cel.getAttribute('style') === cur.getAttribute('style')) toFlatten.push(cel)
+      })
+    }
+    toFlatten.forEach(child => {
+      const parent = child.parentElement!
+      while (child.firstChild) parent.insertBefore(child.firstChild, child)
+      child.remove()
+    })
+    toUnwrap.forEach(span => {
+      const parent = span.parentNode
+      if (!parent) return
+      const frag = doc.createDocumentFragment()
+      while (span.firstChild) frag.appendChild(span.firstChild)
+      parent.replaceChild(frag, span)
+    })
+  }
+  cleanup(el)
+  if (el.parentNode) cleanup(el.parentNode)
 }
 
 /** 将元素按 range 拆分为三段 */

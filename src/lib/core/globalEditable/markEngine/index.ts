@@ -1,15 +1,8 @@
-import { ascendToBlockByStyle, ascendToSpan, cloneSpanWithStyle, getContainerElement, isFragmentEmpty, isWithinSameBlock, mergeAdjacentSpans, splitElementByRange, surroundSelection } from "./dom"
-import { commonSpanForRange, coversNode, getRange, isCollapsed, setRange } from "./selection"
+import { ascendToBlockByStyle, cloneSpanWithStyle, getContainerElement, isFragmentEmpty, isWithinSameBlock, mergeAdjacentSpans, splitElementByRange, surroundSelection } from "./dom"
+import { commonSpanForRange, coversNode, getRange, isCollapsed, normalizeRangeBoundaries, setRange } from "./selection"
 import { getDecoTokens, isComputedBold, isComputedItalic, splitRemoveDeco, splitRemoveStyle } from "./style"
-import { DocCtx, MarkSpec, MarkType, SplitResult } from "./type"
+import { DocCtx, MarkSpec, MarkType } from "./type"
 
-
-
-// 块级元素标签集合
-const BLOCK_TAGS = new Set([
-  'P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 
-  'LI', 'BLOCKQUOTE', 'PRE', 'TABLE', 'TR', 'TD', 'TH'
-])
 
 // Mark 类型到样式的映射
 const styleMap: Record<MarkType, (value?: string) => Record<string, string>> = {
@@ -88,6 +81,7 @@ export class MarkEngine {
       const styles = styleMap[spec.type](spec.value)
       let applied = false
       segments.forEach(r => {
+        setRange(this.ctx, r)
         const created = surroundSelection(this.ctx, styles)
         if (created) {
           mergeAdjacentSpans(created)
@@ -105,8 +99,9 @@ export class MarkEngine {
     
     const range = getRange(this.ctx)
     if (!range) return false
+    const normalized = normalizeRangeBoundaries(this.ctx, range)
 
-    const withinSame = isWithinSameBlock(this.ctx, range)
+    const withinSame = isWithinSameBlock(this.ctx, normalized)
     
     // 检查是否在同一块级元素内
     if (!withinSame) {
@@ -117,9 +112,9 @@ export class MarkEngine {
     this.styleCache.clear()
 
     if (withinSame) {
-      return this.toggleWithinBlock(spec, range)
+      return this.toggleWithinBlock(spec, normalized)
     } else {
-      return this.toggleAcrossBlocks(spec, range)
+      return this.toggleAcrossBlocks(spec, normalized)
     }
   }
   
