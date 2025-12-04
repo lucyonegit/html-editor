@@ -3,6 +3,10 @@ import { useIframeMode } from '../hooks/useIframeMode';
 import Tooltip from '../components/tooltip';
 import { paperContent } from './paper';
 import { useSelectionFormatting } from '../hooks/useSelectionFormatting';
+import { styles as tooltipStyles } from '../components/tooltip/styles';
+import { useToolbarPosition } from '../components/tooltip/hooks/useToolbarPosition';
+import SelectionToolbar from '../components/tooltip/components/SelectionToolbar';
+import type { Position } from '../lib';
 
 const ContentEditableDemo: React.FC = () => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -20,6 +24,9 @@ const ContentEditableDemo: React.FC = () => {
 
   const gm = editor?.globalEditable as any;
   const fmt = useSelectionFormatting(globalOn ? editor : null);
+  const [selectionPos, setSelectionPos] = useState<Position | null>(null);
+  const selectionRef = useRef<HTMLDivElement>(null);
+  const selectionCoords = useToolbarPosition(selectionPos, selectionRef, { offset: 10, placement: 'top' });
 
   useEffect(() => {
     if (!globalOn) return;
@@ -29,6 +36,24 @@ const ContentEditableDemo: React.FC = () => {
     if (fmt.color) setColor(fmt.color);
     if (fmt.backgroundColor) setBg(fmt.backgroundColor);
   }, [fmt, globalOn]);
+
+  useEffect(() => {
+    if (!editor || !iframeRef.current) return;
+    if (!fmt || fmt.collapsed) { setSelectionPos(null); return; }
+    const doc = editor.getDoc().document;
+    const sel = doc.getSelection();
+    if (!sel || sel.rangeCount === 0) { setSelectionPos(null); return; }
+    const rect = sel.getRangeAt(0).getBoundingClientRect();
+    const iframeRect = iframeRef.current.getBoundingClientRect();
+    setSelectionPos({
+      top: rect.top + iframeRect.top + window.scrollY,
+      left: rect.left + iframeRect.left + window.scrollX,
+      width: rect.width,
+      height: rect.height,
+      bottom: rect.bottom + iframeRect.top + window.scrollY,
+      right: rect.right + iframeRect.left + window.scrollX,
+    });
+  }, [fmt, editor]);
 
   return (
     <div style={styles.page}>
@@ -99,6 +124,19 @@ const ContentEditableDemo: React.FC = () => {
 
       {!globalOn && editor && (
         <Tooltip editor={editor} element={selectedElement} position={position} />
+      )}
+      {globalOn && editor && fmt && !fmt.collapsed && selectionPos && (
+        <div
+          style={{
+            ...tooltipStyles.container,
+            top: `${selectionCoords?.top ?? selectionPos.top - 50}px`,
+            left: `${selectionCoords?.left ?? selectionPos.left}px`,
+          }}
+          className="floating-toolbar"
+          ref={selectionRef}
+        >
+          <SelectionToolbar editor={editor} fmt={fmt} />
+        </div>
       )}
     </div>
   );
