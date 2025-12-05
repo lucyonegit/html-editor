@@ -44,7 +44,6 @@ export class HTMLEditor {
   isInsertMode: boolean = false;
   isChangingColor: boolean = false;
   isIframe: boolean;
-  isGlobalContentEditable: boolean = false;
   __globalEditHandlers: { handleInput?: (e: Event) => void; handleKeyDown?: (e: KeyboardEvent) => void } | null = null;
   suppressBodyInputRecord: boolean = false;
 
@@ -100,7 +99,6 @@ export class HTMLEditor {
     this.container = null;
     this.EditorRegistry = EditorRegistry;
     this.isIframe = false;
-    this.isGlobalContentEditable = false as any;
     this.__globalEditHandlers = null as any;
     this.globalEditable = null;
   }
@@ -115,6 +113,7 @@ export class HTMLEditor {
     this.EditorRegistry.register(this);
     this.initializeManagers();
     this.globalEditable = new GlobalEditable(this);
+    this.setGlobalContentEditableEnabled(!!this.options.enableGlobalContentEditable);
     this.bindEvents();
     this.elementWatcher = elementWatcher(this);
     if (this.options.helperBox) {

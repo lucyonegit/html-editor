@@ -32,16 +32,15 @@ export class HelperBoxManager {
     }
   }
   
-  updatePostion(position: Position) {
+   updatePostion(position: Position) {
     if (!this.element) return;
     const { document, view } = this.editor.getDoc();
     if(!view || !document) return;
-    const scrollTop  = view.scrollY || 0;
-    const scrollLeft = view.scrollX || 0;
-
+    const scrollTop  = view.scrollY || this.editor.container?.scrollTop || 0;
+    const scrollLeft = view.scrollX || this.editor.container?.scrollLeft || 0;
 
     const doc = this.editor.container?.ownerDocument || document;
-    let offsetTop = position.top + (this.editor.container?.scrollTop || 0);
+    let offsetTop = position.top;
     let offsetLeft = position.left;
     if (this.editor.isIframe && document?.body) {
       const cs = view?.getComputedStyle(doc.body);
@@ -50,11 +49,13 @@ export class HelperBoxManager {
       offsetTop -= mt;
       offsetLeft -= ml;
     }
+    console.log(position);
     this.element.style.width = `${position.width}px`;
     this.element.style.height = `${position.height}px`;
     this.element.style.top = `${offsetTop + scrollTop }px`;
     this.element.style.left = `${offsetLeft + scrollLeft }px`;
   }
+
 
   // 创建高亮框,根据渲染帧刷新位置（解决dom有动画的case）
   createHighlightTracker() {
