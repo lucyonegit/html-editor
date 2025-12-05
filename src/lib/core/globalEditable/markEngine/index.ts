@@ -1,538 +1,753 @@
-import { ascendToBlockByStyle, cloneSpanWithStyle, getContainerElement, isFragmentEmpty, isWithinSameBlock, mergeAdjacentSpans, splitElementByRange, surroundSelection } from "./dom"
-import { commonSpanForRange, coversNode, getRange, isCollapsed, normalizeRangeBoundaries, setRange } from "./selection"
-import { getDecoTokens, isComputedBold, isComputedItalic, splitRemoveDeco, splitRemoveStyle } from "./style"
-import { DocCtx, MarkSpec, MarkType } from "./type"
+import { DocCtx, MarkSpec } from "../markEngine/type";
 
-
-// Mark 类型到样式的映射
-const styleMap: Record<MarkType, (value?: string) => Record<string, string>> = {
-  bold: () => ({ 'font-weight': 'bold' }),
-  italic: () => ({ 'font-style': 'italic' }),
-  underline: () => ({ 'text-decoration': 'underline' }),
-  strike: () => ({ 'text-decoration': 'line-through' }),
-  color: (v) => ({ color: v || '' }),
-  background: (v) => ({ 'background-color': v || '' }),
-  fontSize: (v) => ({ 'font-size': v || '' }),
-  fontFamily: (v) => ({ 'font-family': v || '' }),
-  highlight: (v) => ({ 'background-color': v || 'yellow' }),
-  code: () => ({ 
-    'font-family': 'monospace',
-    'background-color': '#f5f5f5',
-    'padding': '2px 4px',
-    'border-radius': '3px'
-  }),
-  link: () => ({
-    'color': '#0066cc',
-    'text-decoration': 'underline',
-    'cursor': 'pointer'
-  })
+interface EditorOptions {
+  placeholder: string;
 }
 
-
-/** 样式计算缓存 */
-class StyleCache {
-  private cache = new WeakMap<HTMLElement, CSSStyleDeclaration>()
-  private ctx: DocCtx
-  
-  constructor(ctx: DocCtx) {
-    this.ctx = ctx
-  }
-  
-  get(el: HTMLElement): CSSStyleDeclaration {
-    if (!this.cache.has(el)) {
-      this.cache.set(el, this.ctx.view.getComputedStyle(el))
-    }
-    return this.cache.get(el)!
-  }
-  
-  clear(): void {
-    this.cache = new WeakMap()
-  }
+interface SelectionResult {
+  selection: Selection;
+  range: Range;
 }
 
+interface SplitTextResult {
+  before: string;
+  selected: string;
+  after: string;
+  node: Text;
+}
 
-export class MarkEngine {
-  private ctx: DocCtx
-  private styleCache: StyleCache
-  
-  constructor(ctx: DocCtx) {
-    this.ctx = ctx
-    this.styleCache = new StyleCache(ctx)
+interface FormatCheckResult {
+  has: boolean;
+  element: Node | null;
+}
+
+export class Editor {
+  ctx: DocCtx;
+  element: HTMLElement;
+  options: EditorOptions;
+  _history: string[];
+  _historyIndex: number;
+  _selectionChangeCallbacks: ((selection: Selection) => void)[];
+  _isUndoRedo: boolean;
+  _savedRange: Range | null;
+
+  constructor(ctx: DocCtx, options: EditorOptions) {
+    this.ctx = ctx;
+    this.options = options;
+    this.element = ctx.document.body;
+    this._history = [];
+    this._selectionChangeCallbacks = [];
+    this._historyIndex = -1;
+    this._isUndoRedo = false;
+    this._savedRange = null;
+    this._init();
   }
-  // 处理非跨块元素的样式
-  private toggleWithinBlock(spec: MarkSpec, range: Range) {
-    if (spec.type === 'underline' || spec.type === 'strike') {
-        return this.toggleDecoration(spec, range)
-      }
-      if (spec.type === 'bold' || spec.type === 'italic') {
-        return this.toggleFontStyle(spec, range)
-      }
-      return this.applyStyle(spec)
-  } 
-  // 处理跨块元素的样式
-  private toggleAcrossBlocks(spec: MarkSpec, range: Range) {
-    if (spec.type === 'underline' || spec.type === 'strike') {
-        return this.toggleDecorationAcrossBlocks(spec, range)
-      }
-      if (spec.type === 'bold' || spec.type === 'italic') {
-        return this.toggleFontStyleAcrossBlocks(spec, range)
-      }
-      const segments = this.collectBlockSubRanges(range)
-      const styles = styleMap[spec.type](spec.value)
-      let applied = false
-      segments.forEach(r => {
-        setRange(this.ctx, r)
-        const created = surroundSelection(this.ctx, styles)
-        if (created) {
-          mergeAdjacentSpans(created)
-          applied = true
-        }
-      })
-      return applied
+
+  _init(): void {
+    this._setupPlaceholder();
+    this._setupSelectionListener();
+    this._setupHistory();
+    console.log('editor init successfully');
   }
-  /**
-   * 切换指定标记的应用状态
-   * @returns 是否成功执行操作
-   */
-  toggle(spec: MarkSpec): boolean {
-    if (isCollapsed(this.ctx)) return false
-    
-    const range = getRange(this.ctx)
-    if (!range) return false
-    const normalized = normalizeRangeBoundaries(this.ctx, range)
 
-    const withinSame = isWithinSameBlock(this.ctx, normalized)
+  _setupHistory(): void {
+    this._history = [];
+    this._historyIndex = -1;
+    this._isUndoRedo = false;
     
-    // 检查是否在同一块级元素内
-    if (!withinSame) {
-      return false
-    }
+    // 保存初始状态
+    this._saveHistory();
     
-    // 清除样式缓存
-    this.styleCache.clear()
+    // 监听输入变化，保存历史
+    this.element.addEventListener('input', () => {
+      if (!this._isUndoRedo) {
+        this._saveHistory();
+      }
+    });
+  }
 
-    if (withinSame) {
-      return this.toggleWithinBlock(spec, normalized)
-    } else {
-      return this.toggleAcrossBlocks(spec, normalized)
+  _saveHistory(): void {
+    const html = this.element.innerHTML;
+    
+    // 如果和当前状态相同，不保存
+    if (this._history[this._historyIndex] === html) return;
+    
+    // 删除当前位置之后的历史
+    this._history = this._history.slice(0, this._historyIndex + 1);
+    
+    // 添加新状态
+    this._history.push(html);
+    this._historyIndex = this._history.length - 1;
+    
+    // 限制历史记录数量
+    if (this._history.length > 100) {
+      this._history.shift();
+      this._historyIndex--;
     }
   }
-  
-  /** 处理 text-decoration 类型的切换 */
-  private toggleDecoration(spec: MarkSpec, range: Range): boolean {
-    const decoType = spec.type === 'underline' ? 'underline' : 'line-through'
 
-    let targetSpan = commonSpanForRange(this.ctx, range)
-    if (!targetSpan) {
-      targetSpan = surroundSelection(this.ctx, {})
-      if (!targetSpan) return false
+  undo(): void {
+    if (this._historyIndex > 0) {
+      this._isUndoRedo = true;
+      this._historyIndex--;
+      this.element.innerHTML = this._history[this._historyIndex];
+      this._isUndoRedo = false;
     }
+  }
 
-    const currentTokens = getDecoTokens(this.ctx, targetSpan)
-    const isActive = currentTokens.has(decoType)
-    const fullyCovered = coversNode(this.ctx, range, targetSpan)
+  redo(): void {
+    if (this._historyIndex < this._history.length - 1) {
+      this._isUndoRedo = true;
+      this._historyIndex++;
+      this.element.innerHTML = this._history[this._historyIndex];
+      this._isUndoRedo = false;
+    }
+  }
 
-    if (!isActive && !fullyCovered) {
-      const selSpan = surroundSelection(this.ctx, {})
-      if (!selSpan) return false
-      const newTokens = new Set(currentTokens)
-      newTokens.add(decoType)
-      const decoStr = Array.from(newTokens).join(' ')
-      if (decoStr) {
-        selSpan.style.textDecoration = decoStr
+  canUndo(): boolean {
+    return this._historyIndex > 0;
+  }
+
+  canRedo(): boolean {
+    return this._historyIndex < this._history.length - 1;
+  }
+
+  _setupPlaceholder(): void {
+    const checkPlaceholder = () => {
+      if (!this.element.textContent?.trim()) {
+        this.element.setAttribute('data-placeholder', this.options.placeholder);
       } else {
-        selSpan.style.removeProperty('text-decoration')
+        this.element.removeAttribute('data-placeholder');
       }
-      mergeAdjacentSpans(selSpan)
-      return true
-    }
-
-    if (isActive && !fullyCovered) {
-      splitRemoveDeco(this.ctx, range, targetSpan, decoType)
-      return true
-    }
-
-    const newTokens = new Set(currentTokens)
-    if (newTokens.has(decoType)) {
-      newTokens.delete(decoType)
-    } else {
-      newTokens.add(decoType)
-    }
-    const decoStr = Array.from(newTokens).join(' ')
-    if (decoStr) {
-      targetSpan.style.textDecoration = decoStr
-    } else {
-      targetSpan.style.removeProperty('text-decoration')
-    }
-    mergeAdjacentSpans(targetSpan)
-    return true
-  }
-  
-  /** 处理 bold/italic 的切换 */
-  private toggleFontStyle(spec: MarkSpec, range: Range): boolean {
-    const isBold = spec.type === 'bold'
-    const property = isBold ? 'font-weight' : 'font-style'
-    const activeValue = isBold ? 'bold' : 'italic'
-    const inactiveValue = 'normal'
+    };
     
-    // 先尝试创建或获取包裹 span
-    let targetSpan = commonSpanForRange(this.ctx, range)
-    if (!targetSpan) {
-      targetSpan = surroundSelection(this.ctx, {})
-      if (!targetSpan) return false
-    }
-    
-    const isActive = isBold 
-      ? isComputedBold(this.ctx, targetSpan)
-      : isComputedItalic(this.ctx, targetSpan)
-    const fullyCovered = coversNode(this.ctx, range, targetSpan)
-    
-    // 情况1：已激活且是局部选区 → 局部移除
-    if (isActive && !fullyCovered) {
-      splitRemoveStyle(this.ctx, range, targetSpan, property, inactiveValue)
-      return true
-    }
-    
-    // 情况2：切换整个 span 的状态
-    const newValue = isActive ? inactiveValue : activeValue
-    targetSpan.style.setProperty(property, newValue)
-    
-    mergeAdjacentSpans(targetSpan)
-    return true
+    this.element.addEventListener('input', checkPlaceholder);
+    this.element.addEventListener('focus', checkPlaceholder);
+    this.element.addEventListener('blur', checkPlaceholder);
+    checkPlaceholder();
   }
 
+  _setupSelectionListener(): void {
+    this._selectionChangeCallbacks = [];
+    
+    this.ctx.document.addEventListener('selectionchange', () => {
+      const selection = this.ctx.view.getSelection();
+      if (selection && selection.anchorNode && this.element.contains(selection.anchorNode)) {
+        this._selectionChangeCallbacks.forEach(cb => cb(selection));
+      }
+    });
+  }
 
-  private collectBlockSubRanges(range: Range): Range[] {
-    const startEl = getContainerElement(range.startContainer)
-    const endEl = getContainerElement(range.endContainer)
-    const startBlock = ascendToBlockByStyle(this.ctx, startEl)
-    const endBlock = ascendToBlockByStyle(this.ctx, endEl)
-    if (!startBlock || !endBlock) return [range.cloneRange()]
-    if (startBlock === endBlock) return [range.cloneRange()]
-    const ranges: Range[] = []
-    const first = this.ctx.document.createRange()
-    first.setStart(range.startContainer, range.startOffset)
-    first.setEnd(startBlock, startBlock.childNodes.length)
-    ranges.push(first)
+  onSelectionChange(callback: (selection: Selection) => void): void {
+    this._selectionChangeCallbacks.push(callback);
+  }
+
+  /**
+   * 获取当前选区
+   */
+  getSelection(): SelectionResult | null {
+    const selection = this.ctx.view.getSelection();
+    if (!selection || selection.rangeCount === 0) return null;
+    
+    const range = selection.getRangeAt(0);
+    
+    if (!this.element.contains(range.commonAncestorContainer)) {
+      return null;
+    }
+    
+    return { selection, range };
+  }
+
+  /**
+   * 保存当前选区
+   */
+  saveSelection(): Range | null {
+    const sel = this.getSelection();
+    if (sel) {
+      this._savedRange = sel.range.cloneRange();
+    }
+    return this._savedRange;
+  }
+
+  /**
+   * 恢复保存的选区
+   */
+  restoreSelection(): void {
+    if (this._savedRange) {
+      const selection = this.ctx.view.getSelection();
+      if (!selection) return;
+      selection.removeAllRanges();
+      selection.addRange(this._savedRange);
+    }
+  }
+
+  /**
+   * 获取选区内的所有文本节点
+   */
+  _getTextNodesInRange(range: Range): Node[] {
+    const textNodes: Node[] = [];
     const walker = this.ctx.document.createTreeWalker(
-      this.ctx.document.body,
-      NodeFilter.SHOW_ELEMENT,
-      {
-        acceptNode: (node) => {
-          const el = node as HTMLElement
-          const display = this.ctx.view.getComputedStyle(el).display
-          return display !== 'inline' ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP
-        }
-      }
-    )
-    ;(walker as any).currentNode = startBlock
-    let node: Node | null
+      range.commonAncestorContainer.nodeType === Node.TEXT_NODE 
+        ? range.commonAncestorContainer.parentNode as Node
+        : range.commonAncestorContainer,
+      NodeFilter.SHOW_TEXT,
+      null
+    );
+
+    let node: Node | null;
     while ((node = walker.nextNode())) {
-      if (node === endBlock) break
-      const mid = this.ctx.document.createRange()
-      mid.selectNodeContents(node as Element)
-      ranges.push(mid)
-    }
-    const last = this.ctx.document.createRange()
-    last.setStart(endBlock, 0)
-    last.setEnd(range.endContainer, range.endOffset)
-    ranges.push(last)
-    return ranges
-  }
-
-  private isRangeActiveDeco(range: Range, deco: 'underline' | 'line-through'): boolean {
-    const span = commonSpanForRange(this.ctx, range)
-    if (!span) return false
-    if (!coversNode(this.ctx, range, span)) return false
-    const tokens = getDecoTokens(this.ctx, span)
-    return tokens.has(deco)
-  }
-
-  private isRangeActiveFont(range: Range, isBold: boolean): boolean {
-    const span = commonSpanForRange(this.ctx, range)
-    if (!span) return false
-    if (!coversNode(this.ctx, range, span)) return false
-    return isBold ? isComputedBold(this.ctx, span) : isComputedItalic(this.ctx, span)
-  }
-
-  private toggleDecorationAcrossBlocks(spec: MarkSpec, range: Range): boolean {
-    this.normalizeInlineTagsInRange(range)
-    const deco = spec.type === 'underline' ? 'underline' : 'line-through'
-    const segments = this.collectBlockSubRanges(range)
-    const activeAll = segments.length > 0 && segments.every(r => this.isRangeActiveDeco(r, deco))
-    if (activeAll) {
-      segments.forEach(r => {
-        const span = commonSpanForRange(this.ctx, r)
-        if (span && coversNode(this.ctx, r, span)) {
-          splitRemoveDeco(this.ctx, r, span, deco)
-        }
-      })
-      return true
-    }
-    segments.forEach(r => {
-      let span = commonSpanForRange(this.ctx, r)
-      if (span && coversNode(this.ctx, r, span)) {
-        const tokens = getDecoTokens(this.ctx, span)
-        const newTokens = new Set(tokens)
-        newTokens.add(deco)
-        const str = Array.from(newTokens).join(' ')
-        span.style.textDecoration = str
-        mergeAdjacentSpans(span)
-      } else {
-        const created = surroundSelection(this.ctx, {})
-        if (created) {
-          const tokens = getDecoTokens(this.ctx, created)
-          const newTokens = new Set(tokens)
-          newTokens.add(deco)
-          const str = Array.from(newTokens).join(' ')
-          created.style.textDecoration = str
-          mergeAdjacentSpans(created)
-        }
+      if (range.intersectsNode(node)) {
+        textNodes.push(node);
       }
-    })
-    return true
+    }
+    return textNodes;
   }
 
-  private toggleFontStyleAcrossBlocks(spec: MarkSpec, range: Range): boolean {
-    this.normalizeInlineTagsInRange(range)
-    const isBold = spec.type === 'bold'
-    const property = isBold ? 'font-weight' : 'font-style'
-    const activeValue = isBold ? 'bold' : 'italic'
-    const inactiveValue = 'normal'
-    const segments = this.collectBlockSubRanges(range)
-    const activeAll = segments.length > 0 && segments.every(r => this.isRangeActiveFont(r, isBold))
-    if (activeAll) {
-      segments.forEach(r => {
-        const span = commonSpanForRange(this.ctx, r)
-        if (span && coversNode(this.ctx, r, span)) {
-          splitRemoveStyle(this.ctx, r, span, property, inactiveValue)
-        }
-      })
-      return true
-    }
-    segments.forEach(r => {
-      let span = commonSpanForRange(this.ctx, r)
-      if (span && coversNode(this.ctx, r, span)) {
-        span.style.setProperty(property, activeValue)
-        mergeAdjacentSpans(span)
-      } else {
-        const created = surroundSelection(this.ctx, {})
-        if (created) {
-          created.style.setProperty(property, activeValue)
-          mergeAdjacentSpans(created)
-        }
-      }
-    })
-    return true
-  }
-
-  private normalizeInlineTagsInRange(range: Range): void {
-    const body = this.ctx.document.body
-    const walker = this.ctx.document.createTreeWalker(body, NodeFilter.SHOW_ELEMENT)
-    let node: Node | null
-    const map: Record<string, { prop: string, value: string }> = {
-      B: { prop: 'font-weight', value: 'bold' },
-      STRONG: { prop: 'font-weight', value: 'bold' },
-      I: { prop: 'font-style', value: 'italic' },
-      EM: { prop: 'font-style', value: 'italic' },
-      U: { prop: 'text-decoration', value: 'underline' },
-      S: { prop: 'text-decoration', value: 'line-through' },
-      STRIKE: { prop: 'text-decoration', value: 'line-through' }
-    }
-    while ((node = walker.nextNode())) {
-      const el = node as HTMLElement
-      const tag = el.tagName
-      if (!map[tag]) continue
-      const inter = (range as any).intersectsNode ? (range as any).intersectsNode(el) : true
-      if (!inter) continue
-      const span = this.ctx.document.createElement('span')
-      const styleAttr = el.getAttribute('style') || ''
-      if (styleAttr) span.setAttribute('style', styleAttr)
-      span.style.setProperty(map[tag].prop, map[tag].value)
-      while (el.firstChild) span.appendChild(el.firstChild)
-      el.parentNode?.replaceChild(span, el)
-    }
-  }
-  
   /**
-   * 应用普通样式（颜色、字号等）
+   * 切割文本节点，只包裹选中部分
    */
-  private applyStyle(spec: MarkSpec): boolean {
-    const styles = styleMap[spec.type](spec.value)
-    const range = getRange(this.ctx)
-    if (!range) return false
+  _splitTextNode(textNode: Text, range: Range): SplitTextResult {
+    const text = textNode.textContent || '';
+    const startOffset = textNode === range.startContainer ? range.startOffset : 0;
+    const endOffset = textNode === range.endContainer ? range.endOffset : text.length;
 
-    const normalized = normalizeRangeBoundaries(this.ctx, range)
+    const before = text.slice(0, startOffset);
+    const selected = text.slice(startOffset, endOffset);
+    const after = text.slice(endOffset);
 
-    let targetSpan = commonSpanForRange(this.ctx, normalized)
+    return { before, selected, after, node: textNode };
+  }
 
-    if (!targetSpan) {
-      const created = surroundSelection(this.ctx, styles)
-      if (!created) return false
-      if (spec.type === 'link' && spec.attrs?.href) {
-        created.setAttribute('data-href', spec.attrs.href)
-        created.style.cursor = 'pointer'
-      }
-      // 合并子元素
-      mergeAdjacentSpans(created)
-       //清空所有子元素的样式，只应用父节点的样式
-      Array.from(created.children).forEach(child => {
-        child.removeAttribute('style')
-      })
-      return true
-    }
-
-    const fullyCovered = coversNode(this.ctx, normalized, targetSpan)
-
-    if (fullyCovered) {
-      Object.entries(styles).forEach(([prop, value]) => {
-        if (value) {
-          targetSpan.style.setProperty(prop, value)
-        } else {
-          targetSpan.style.removeProperty(prop)
+  /**
+   * 检查节点是否已经有指定的格式
+   */
+  _hasFormat(
+    node: Node,
+    tagName: string | null,
+    styleProp: keyof CSSStyleDeclaration | null,
+    styleValue: string | null
+  ): FormatCheckResult {
+    let current: Node | null = node;
+    while (current && current !== this.element) {
+      if (current.nodeType === Node.ELEMENT_NODE) {
+        const element = current as HTMLElement;
+        // 检查标签名
+        if (tagName && element.tagName === tagName.toUpperCase()) {
+          return { has: true, element: current };
         }
-      })
-      if (spec.type === 'link' && spec.attrs?.href) {
-        targetSpan.setAttribute('data-href', spec.attrs.href)
-        targetSpan.style.cursor = 'pointer'
+        // 检查样式
+        if (styleProp && element.style && element.style[styleProp]) {
+          if (!styleValue || element.style[styleProp] === styleValue) {
+            return { has: true, element: current };
+          }
+        }
       }
-      mergeAdjacentSpans(targetSpan)
-      const newRange = this.ctx.document.createRange()
-      newRange.selectNodeContents(targetSpan)
-      setRange(this.ctx, newRange)
-      return true
+      current = current.parentNode;
     }
+    return { has: false, element: null };
+  }
+
+  /**
+   * 用指定标签包裹选中文本（支持切换）
+   */
+  _wrapWithTag(tagName: string, styles: Partial<CSSStyleDeclaration> = {}): boolean {
+    const sel = this.getSelection();
+    if (!sel || sel.range.collapsed) return false;
+
+    const { range } = sel;
+    const textNodes = this._getTextNodesInRange(range);
     
+    if (textNodes.length === 0) return false;
 
-    const split = splitElementByRange(this.ctx, normalized, targetSpan)
-    const parent = targetSpan.parentNode!
-    const sequence: Node[] = []
+    // 检查是否所有节点都已有此格式
+    const allHaveFormat = textNodes.every(node => 
+      this._hasFormat(node, tagName, null, null).has
+    );
 
-    if (!isFragmentEmpty(split.pre)) {
-      const preSpan = cloneSpanWithStyle(this.ctx, targetSpan, {})
-      preSpan.appendChild(split.pre)
-      sequence.push(preSpan)
-    }
+    const newNodes: Node[] = [];
 
-    const midSpan = cloneSpanWithStyle(this.ctx, targetSpan, {})
-    Object.entries(styles).forEach(([prop, value]) => {
-      if (value) {
-        midSpan.style.setProperty(prop, value)
-      } else {
-        midSpan.style.removeProperty(prop)
+    textNodes.forEach(textNode => {
+      const { before, selected, after } = this._splitTextNode(textNode as Text, range);
+      const parent = textNode.parentNode;
+
+      if (!selected || !parent) return;
+
+      const fragment = this.ctx.document.createDocumentFragment();
+
+      // 前面未选中的部分
+      if (before) {
+        fragment.appendChild(this.ctx.document.createTextNode(before));
       }
-    })
-    if (spec.type === 'link' && spec.attrs?.href) {
-      midSpan.setAttribute('data-href', spec.attrs.href)
-      midSpan.style.cursor = 'pointer'
+
+      // 选中的部分
+      if (allHaveFormat) {
+        // 移除格式：直接插入文本
+        const textOnly = this.ctx.document.createTextNode(selected);
+        fragment.appendChild(textOnly);
+        newNodes.push(textOnly);
+      } else {
+        // 添加格式：用标签包裹
+        const wrapper = this.ctx.document.createElement(tagName);
+        Object.assign(wrapper.style, styles);
+        wrapper.textContent = selected;
+        fragment.appendChild(wrapper);
+        newNodes.push(wrapper);
+      }
+
+      // 后面未选中的部分
+      if (after) {
+        fragment.appendChild(this.ctx.document.createTextNode(after));
+      }
+
+      parent.replaceChild(fragment, textNode);
+    });
+
+    // 如果是移除格式，需要解除父级标签包裹
+    if (allHaveFormat) {
+      newNodes.forEach(node => {
+        this._unwrapFromTag(node, tagName);
+      });
     }
-    let midNode: Node
-    const hasStyle = (midSpan.getAttribute('style') || '').trim()
-    if (hasStyle) {
-      midSpan.appendChild(split.mid)
-      midNode = midSpan
+
+    // 重新选中处理后的内容
+    this._selectNodes(newNodes);
+    return true;
+  }
+
+  /**
+   * 从指定标签中解除包裹
+   */
+  _unwrapFromTag(node: Node, tagName: string): void {
+    let current: Node | null = node.parentNode;
+    while (current && current !== this.element) {
+      if (current.nodeType === Node.ELEMENT_NODE && (current as HTMLElement).tagName === tagName.toUpperCase()) {
+        const parent = current.parentNode;
+        if (!parent) return;
+        while (current.firstChild) {
+          parent.insertBefore(current.firstChild, current);
+        }
+        parent.removeChild(current);
+        return;
+      }
+      current = current.parentNode;
+    }
+  }
+
+  /**
+   * 用样式包裹选中文本
+   */
+  _wrapWithStyle(styleProp: keyof CSSStyleDeclaration, styleValue: string): boolean {
+    const sel = this.getSelection();
+    if (!sel || sel.range.collapsed) return false;
+
+    const { range } = sel;
+    const textNodes = this._getTextNodesInRange(range);
+    
+    if (textNodes.length === 0) return false;
+
+    const newNodes: Node[] = [];
+
+    textNodes.forEach(textNode => {
+      const { before, selected, after } = this._splitTextNode(textNode as Text, range);
+      const parent = textNode.parentNode;
+
+      if (!selected || !parent) return;
+
+      const fragment = this.ctx.document.createDocumentFragment();
+
+      if (before) {
+        fragment.appendChild(this.ctx.document.createTextNode(before));
+      }
+
+      const wrapper = this.ctx.document.createElement('span');
+      (wrapper.style as any)[styleProp] = styleValue;
+      wrapper.textContent = selected;
+      fragment.appendChild(wrapper);
+      newNodes.push(wrapper);
+
+      if (after) {
+        fragment.appendChild(this.ctx.document.createTextNode(after));
+      }
+
+      parent.replaceChild(fragment, textNode);
+    });
+
+    this._selectNodes(newNodes);
+    return true;
+  }
+
+  /**
+   * 重新选中多个节点
+   */
+  _selectNodes(nodes: Node[]): void {
+    if (nodes.length === 0) return;
+
+    const selection = this.ctx.view.getSelection();
+    if (!selection) return;
+    
+    const range = this.ctx.document.createRange();
+
+    const firstNode = nodes[0];
+    const lastNode = nodes[nodes.length - 1];
+
+    // 找到实际的文本节点
+    const getFirstTextNode = (node: Node): Node => {
+      if (node.nodeType === Node.TEXT_NODE) return node;
+      return node.firstChild ? getFirstTextNode(node.firstChild) : node;
+    };
+
+    const getLastTextNode = (node: Node): Node => {
+      if (node.nodeType === Node.TEXT_NODE) return node;
+      return node.lastChild ? getLastTextNode(node.lastChild) : node;
+    };
+
+    const startNode = getFirstTextNode(firstNode);
+    const endNode = getLastTextNode(lastNode);
+
+    range.setStart(startNode, 0);
+    range.setEnd(endNode, endNode.textContent?.length || 0);
+
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  /**
+   * 加粗
+   */
+  bold(): void {
+    this._wrapWithTag('strong');
+  }
+
+  /**
+   * 斜体
+   */
+  italic(): void {
+    this._wrapWithTag('em');
+  }
+
+  /**
+   * 下划线
+   */
+  underline(): void {
+    this._wrapWithTag('u');
+  }
+
+  /**
+   * 删除线
+   */
+  strikethrough(): void {
+    this._wrapWithTag('s');
+  }
+
+  /**
+   * 设置文字颜色
+   */
+  setForeColor(color: string): void {
+    this._wrapWithStyle('color', color);
+  }
+
+  /**
+   * 设置背景色
+   */
+  setBackColor(color: string): void {
+    this._wrapWithStyle('backgroundColor', color);
+  }
+
+  /**
+   * 设置字体大小
+   */
+  setFontSize(size: string): void {
+    this._wrapWithStyle('fontSize', size);
+  }
+
+  toggle(spec: MarkSpec): boolean {
+    console.log('runing:11111');
+    switch (spec.type) {
+      case 'bold':
+        return this._wrapWithTag('strong');
+      case 'italic':
+        return this._wrapWithTag('em');
+      case 'underline':
+        return this._wrapWithTag('u');
+      case 'strike':
+        return this._wrapWithTag('s');
+      case 'color':
+        return this._wrapWithStyle('color', spec.value!);
+      case 'background':
+        return this._wrapWithStyle('backgroundColor', spec.value!);
+      case 'fontSize':
+        return this._wrapWithStyle('fontSize', spec.value!);
+    }
+    return true
+  }
+
+  /**
+   * 清除格式
+   */
+  removeFormat(): void {
+    const sel = this.getSelection();
+    if (!sel || sel.range.collapsed) return;
+
+    const { range } = sel;
+    const textNodes = this._getTextNodesInRange(range);
+    
+    const newTextNodes: Node[] = [];
+
+    textNodes.forEach(textNode => {
+      const { before, selected, after } = this._splitTextNode(textNode as Text, range);
+      const parent = textNode.parentNode;
+
+      if (!selected || !parent) return;
+
+      // 创建纯文本节点
+      const plainText = this.ctx.document.createTextNode(selected);
+      
+      // 找到最近的块级父元素
+      let blockParent: Node | null = parent;
+      while (blockParent && blockParent !== this.element) {
+        if (blockParent.nodeType === Node.ELEMENT_NODE) {
+          const display = this.ctx.view.getComputedStyle(blockParent as Element).display;
+          if (display === 'block' || display === 'list-item') break;
+        }
+        blockParent = blockParent.parentNode;
+      }
+
+      const fragment = this.ctx.document.createDocumentFragment();
+      if (before) fragment.appendChild(this.ctx.document.createTextNode(before));
+      fragment.appendChild(plainText);
+      if (after) fragment.appendChild(this.ctx.document.createTextNode(after));
+
+      parent.replaceChild(fragment, textNode);
+      newTextNodes.push(plainText);
+
+      // 清理空的行内元素
+      this._cleanEmptyInlineElements((blockParent || this.element) as HTMLElement);
+    });
+
+    this._selectNodes(newTextNodes);
+  }
+
+  /**
+   * 清理空的行内元素
+   */
+  _cleanEmptyInlineElements(container: HTMLElement): void {
+    const inlineTags = ['SPAN', 'STRONG', 'EM', 'U', 'S', 'B', 'I', 'FONT'];
+    inlineTags.forEach(tag => {
+      const elements = container.querySelectorAll(tag);
+      elements.forEach(el => {
+        if (!el.textContent?.trim()) {
+          el.parentNode?.removeChild(el);
+        }
+      });
+    });
+  }
+
+  /**
+   * 插入有序列表
+   */
+  insertOrderedList(): void {
+    this._insertList('ol');
+  }
+
+  /**
+   * 插入无序列表
+   */
+  insertUnorderedList(): void {
+    this._insertList('ul');
+  }
+
+  /**
+   * 插入列表
+   */
+  _insertList(listType: 'ol' | 'ul'): void {
+    const sel = this.getSelection();
+    if (!sel) return;
+
+    const { range } = sel;
+    
+    // 获取当前块级元素
+    let block: Node | null = range.commonAncestorContainer;
+    while (block && block !== this.element && block.nodeType !== Node.ELEMENT_NODE) {
+      block = block.parentNode;
+    }
+
+    // 检查是否已经在列表中
+    let existingList: Node | null = block;
+    while (existingList && existingList !== this.element) {
+      if (existingList.nodeType === Node.ELEMENT_NODE) {
+        const element = existingList as HTMLElement;
+        if (element.tagName === 'UL' || element.tagName === 'OL') {
+          // 移除列表
+          const items = element.querySelectorAll('li');
+          const fragment = this.ctx.document.createDocumentFragment();
+          items.forEach(item => {
+            const p = this.ctx.document.createElement('p');
+            p.innerHTML = item.innerHTML;
+            fragment.appendChild(p);
+          });
+          existingList.parentNode?.replaceChild(fragment, existingList);
+          return;
+        }
+      }
+      existingList = existingList.parentNode;
+    }
+
+    // 创建新列表
+    const list = this.ctx.document.createElement(listType);
+    const li = this.ctx.document.createElement('li');
+    
+    if (range.collapsed) {
+      li.innerHTML = '<br>';
     } else {
-      midNode = split.mid
+      li.appendChild(range.extractContents());
     }
-    sequence.push(midNode)
+    
+    list.appendChild(li);
+    range.insertNode(list);
 
-    if (!isFragmentEmpty(split.post)) {
-      const postSpan = cloneSpanWithStyle(this.ctx, targetSpan, {})
-      postSpan.appendChild(split.post)
-      sequence.push(postSpan)
-    }
-
-    sequence.forEach(node => parent.insertBefore(node, targetSpan))
-    parent.removeChild(targetSpan)
-
-    if (midNode.nodeType === Node.ELEMENT_NODE) {
-      mergeAdjacentSpans(midNode as HTMLElement)
-    }
-
-    const newRange = this.ctx.document.createRange()
-    if (midNode.nodeType === Node.ELEMENT_NODE) {
-      newRange.selectNodeContents(midNode as Element)
-    } else if (midNode.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
-      const firstChild = (midNode as DocumentFragment).firstChild
-      const lastChild = (midNode as DocumentFragment).lastChild
-      if (firstChild && lastChild) {
-        newRange.setStartBefore(firstChild)
-        newRange.setEndAfter(lastChild)
-      }
-    }
-    setRange(this.ctx, newRange)
-    return true
+    // 光标移到列表项内
+    const newRange = this.ctx.document.createRange();
+    newRange.selectNodeContents(li);
+    newRange.collapse(false);
+    const selection = this.ctx.view.getSelection();
+    if (!selection) return;
+    selection.removeAllRanges();
+    selection.addRange(newRange);
   }
-  
+
   /**
-   * 移除选区的所有格式
+   * 对齐方式
    */
-  clearFormat(): boolean {
-    if (isCollapsed(this.ctx)) return false
-    
-    const range = getRange(this.ctx)
-    if (!range) return false
-    
-    const span = commonSpanForRange(this.ctx, range)
-    if (!span) return false
-    
-    if (coversNode(this.ctx, range, span)) {
-      // 完全覆盖：移除 span
-      const fragment = this.ctx.document.createDocumentFragment()
-      while (span.firstChild) {
-        fragment.appendChild(span.firstChild)
+  align(alignment: string): void {
+    const sel = this.getSelection();
+    if (!sel) return;
+
+    let block: Node | null = sel.range.commonAncestorContainer;
+    while (block && block !== this.element) {
+      if (block.nodeType === Node.ELEMENT_NODE) {
+        const element = block as HTMLElement;
+        const display = this.ctx.view.getComputedStyle(element).display;
+        if (display === 'block' || display === 'list-item') {
+          element.style.textAlign = alignment.toLowerCase();
+          return;
+        }
       }
-      span.parentNode?.replaceChild(fragment, span)
-    } else {
-      // 局部覆盖：拆分并移除中段样式
-      const split = splitElementByRange(this.ctx, range, span)
-      const parent = span.parentNode!
-      const sequence: Node[] = []
-      
-      if (!isFragmentEmpty(split.pre)) {
-        const preSpan = cloneSpanWithStyle(this.ctx, span, {})
-        preSpan.appendChild(split.pre)
-        sequence.push(preSpan)
-      }
-      
-      sequence.push(split.mid)
-      
-      if (!isFragmentEmpty(split.post)) {
-        const postSpan = cloneSpanWithStyle(this.ctx, span, {})
-        postSpan.appendChild(split.post)
-        sequence.push(postSpan)
-      }
-      
-      sequence.forEach(node => parent.insertBefore(node, span))
-      parent.removeChild(span)
+      block = block.parentNode;
     }
+
+    // 如果没有块级元素，包裹在 div 中
+    const div = this.ctx.document.createElement('div');
+    div.style.textAlign = alignment.toLowerCase();
     
-    return true
+    const { range } = sel;
+    if (!range.collapsed) {
+      div.appendChild(range.extractContents());
+      range.insertNode(div);
+    }
   }
-  
+
   /**
-   * 获取当前选区的激活标记
+   * 插入链接
    */
-  getActiveMarks(): Set<MarkType> {
-    const range = getRange(this.ctx)
-    if (!range) return new Set()
-    
-    const span = commonSpanForRange(this.ctx, range)
-    if (!span) return new Set()
-    
-    const active = new Set<MarkType>()
-    
-    if (isComputedBold(this.ctx, span)) active.add('bold')
-    if (isComputedItalic(this.ctx, span)) active.add('italic')
-    
-    const decoTokens = getDecoTokens(this.ctx, span)
-    if (decoTokens.has('underline')) active.add('underline')
-    if (decoTokens.has('line-through')) active.add('strike')
-    
-    const cs = this.ctx.view.getComputedStyle(span)
-    if (cs.color && cs.color !== 'rgb(0, 0, 0)') active.add('color')
-    if (cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)') active.add('background')
-    
-    return active
+  insertLink(url: string): void {
+    const sel = this.getSelection();
+    if (!sel || sel.range.collapsed) return;
+
+    const { range } = sel;
+    const a = this.ctx.document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.appendChild(range.extractContents());
+    range.insertNode(a);
+
+    // 选中链接
+    const newRange = this.ctx.document.createRange();
+    newRange.selectNodeContents(a);
+    const selection = this.ctx.view.getSelection();
+    if (!selection) return;
+    selection.removeAllRanges();
+    selection.addRange(newRange);
+  }
+
+  /**
+   * 移除链接
+   */
+  removeLink(): void {
+    const sel = this.getSelection();
+    if (!sel) return;
+
+    let node: Node | null = sel.range.commonAncestorContainer;
+    while (node && node !== this.element) {
+      if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === 'A') {
+        const parent = node.parentNode;
+        if (!parent) return;
+        while (node.firstChild) {
+          parent.insertBefore(node.firstChild, node);
+        }
+        parent.removeChild(node);
+        return;
+      }
+      node = node.parentNode;
+    }
+  }
+
+  /**
+   * 检查当前选区是否有某个格式
+   */
+  queryFormat(tagName: string): boolean {
+    const sel = this.getSelection();
+    if (!sel) return false;
+
+    let node: Node | null = sel.range.commonAncestorContainer;
+    while (node && node !== this.element) {
+      if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === tagName.toUpperCase()) {
+        return true;
+      }
+      node = node.parentNode;
+    }
+    return false;
+  }
+
+  /**
+   * 获取编辑器HTML内容
+   */
+  getHTML(): string {
+    return this.element.innerHTML;
+  }
+
+  /**
+   * 设置编辑器HTML内容
+   */
+  setHTML(html: string): void {
+    this.element.innerHTML = html;
+  }
+
+  /**
+   * 获取纯文本内容
+   */
+  getText(): string {
+    return this.element.textContent || '';
+  }
+
+  /**
+   * 清空内容
+   */
+  clear(): void {
+    this.element.innerHTML = '';
+  }
+
+  /**
+   * 聚焦编辑器
+   */
+  focus(): void {
+    this.element.focus();
+  }
+
+  /**
+   * 销毁编辑器
+   */
+  destroy(): void {
+    (this.element as any).contentEditable = 'false';
+    this._selectionChangeCallbacks = [];
   }
 }

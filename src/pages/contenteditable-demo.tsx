@@ -6,7 +6,6 @@ import { useSelectionFormatting } from '../hooks/useSelectionFormatting';
 import { styles as tooltipStyles } from '../components/tooltip/styles';
 import { useToolbarPosition } from '../components/tooltip/hooks/useToolbarPosition';
 import SelectionToolbar from '../components/tooltip/components/SelectionToolbar';
-import type { Position } from '../lib';
 
 const ContentEditableDemo: React.FC = () => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -24,7 +23,7 @@ const ContentEditableDemo: React.FC = () => {
 
   const gm = editor?.globalEditable as any;
   const fmt = useSelectionFormatting(globalOn ? editor : null);
-  const [selectionPos, setSelectionPos] = useState<Position | null>(null);
+  const [selectionPos, setSelectionPos] = useState<any>(null);
   const selectionRef = useRef<HTMLDivElement>(null);
   const selectionCoords = useToolbarPosition(selectionPos, selectionRef, { offset: 10, placement: 'top' });
 

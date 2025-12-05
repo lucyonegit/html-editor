@@ -1,14 +1,13 @@
 import { HTMLEditor } from '../editor';
 import { createContentChangeCommand } from '../historyManager/commands';
-import { MarkEngine } from './markEngine';
-import type { MarkSpec, MarkType } from './markEngine/type';
+import {Editor} from './markEngine'
+import type { MarkSpec } from './markEngine/type';
 
 export class GlobalEditable {
   private editor: HTMLEditor;
   private enabled: boolean = false;
   private lastRecorded: string = '';
   private handlers: { input?: (e: Event) => void; keydown?: (e: KeyboardEvent) => void; selectionchange?: () => void } = {};
-  private lastRange: Range | null = null;
 
   constructor(editor: HTMLEditor) {
     this.editor = editor;
@@ -86,18 +85,10 @@ export class GlobalEditable {
         onInput();
       }
     };
-    const onSelectionChange = () => {
-      const sel = doc.document.getSelection();
-      if (sel && sel.rangeCount > 0) {
-        try {
-          this.lastRange = sel.getRangeAt(0).cloneRange();
-        } catch {}
-      }
-    };
+
     doc.document.body.addEventListener('input', onInput);
     doc.document.body.addEventListener('keydown', onKeydown);
-    doc.document.addEventListener('selectionchange', onSelectionChange);
-    this.handlers = { input: onInput, keydown: onKeydown, selectionchange: onSelectionChange };
+    this.handlers = { input: onInput, keydown: onKeydown };
   }
 
   private unbindListeners(): void {
@@ -145,109 +136,9 @@ export class GlobalEditable {
 
   private toggleMark(spec: MarkSpec): boolean {
     const ctx = this.editor.getDoc();
-    const engine = new MarkEngine(ctx as any);
-    let sel = ctx.document.getSelection();
-    const restoreSelection = () => {
-      if ((!sel || sel.rangeCount === 0 || sel.isCollapsed) && this.lastRange) {
-        try {
-          ctx.document.body.focus();
-          const s = ctx.document.getSelection();
-          s?.removeAllRanges();
-          s?.addRange(this.lastRange);
-        } catch {}
-      }
-    };
-    restoreSelection();
-    sel = ctx.document.getSelection();
-    const isCollapsed = !sel || sel.rangeCount === 0 || sel.isCollapsed;
-    if (!isCollapsed) {
-      return this.withContentHistory(() => {
-        const ok = engine.toggle(spec);
-        if (!ok) {
-          const map: Record<string, { cmd: string; value?: string }> = {
-            bold: { cmd: 'bold' },
-            italic: { cmd: 'italic' },
-            underline: { cmd: 'underline' },
-            strike: { cmd: 'strikethrough' },
-            color: { cmd: 'foreColor', value: spec.value },
-            background: { cmd: 'backColor', value: spec.value },
-          };
-          const f = map[spec.type as string];
-          if (f) {
-            try { ctx.document.execCommand(f.cmd, false, f.value); } catch {}
-          }
-        }
-      });
-    }
-    const applyCollapsed = () => {
-      const curSel = ctx.document.getSelection();
-      if (!curSel || curSel.rangeCount === 0) return;
-      const range = curSel.getRangeAt(0);
-      const span = ctx.document.createElement('span');
-      const set = (p: string, v?: string) => { if (v) span.style.setProperty(p, v); };
-      switch (spec.type) {
-        case 'bold': set('font-weight', 'bold'); break;
-        case 'italic': set('font-style', 'italic'); break;
-        case 'underline': set('text-decoration', 'underline'); break;
-        case 'strike': set('text-decoration', 'line-through'); break;
-        case 'color': set('color', spec.value); break;
-        case 'background': set('background-color', spec.value); break;
-        case 'fontSize': set('font-size', spec.value); break;
-        case 'fontFamily': set('font-family', spec.value); break;
-        case 'highlight': set('background-color', spec.value || 'yellow'); break;
-        case 'code':
-          set('font-family', 'monospace');
-          set('background-color', '#f5f5f5');
-          set('padding', '2px 4px');
-          set('border-radius', '3px');
-          break;
-        case 'link':
-          set('color', '#0066cc');
-          set('text-decoration', 'underline');
-          span.style.cursor = 'pointer';
-          if (spec.attrs?.href) span.setAttribute('data-href', spec.attrs.href);
-          break;
-      }
-      const zwsp = ctx.document.createTextNode('\u200B');
-      span.appendChild(zwsp);
-      range.insertNode(span);
-      const newRange = ctx.document.createRange();
-      newRange.setStart(span.firstChild as Text, 1);
-      newRange.collapse(true);
-      if(!sel) return false;
-      sel.removeAllRanges();
-      sel.addRange(newRange);
-    };
-    return this.withContentHistory(applyCollapsed);
-  }
-
-
-  private applyBlockStyle(property: string, value: string): boolean {
-    const doc = this.editor.getDoc();
-    let sel = doc.document.getSelection();
-    if ((!sel || sel.rangeCount === 0 || sel.isCollapsed) && this.lastRange) {
-      try {
-        doc.document.body.focus();
-        const s = doc.document.getSelection();
-        s?.removeAllRanges();
-        s?.addRange(this.lastRange);
-        sel = s ?? sel;
-      } catch {}
-    }
-    if (!sel || sel.rangeCount === 0) return false;
-    const range = sel.getRangeAt(0);
-    let node: Node = range.commonAncestorContainer;
-    if (node.nodeType === 3) node = node.parentNode as Node;
-    let el = node as HTMLElement;
-    const view = doc.view as Window;
-    while (el && el !== this.getTarget()) {
-      const display = view.getComputedStyle(el).display;
-      if (display !== 'inline') break;
-      el = el.parentElement as HTMLElement;
-    }
-    if (!el) el = this.getTarget();
-    el.style.setProperty(property, value);
-    return true;
+    const engine = new Editor(ctx as any, { placeholder: '' });
+    const action = ()=>engine.toggle(spec);
+    return this.withContentHistory(action);
   }
 
   applySelectionBold(): boolean {
@@ -283,21 +174,7 @@ export class GlobalEditable {
   applySelectionLink(href: string): boolean {
     return this.toggleMark({ type: 'link', attrs: { href } });
   }
-  applySelectionAlign(align: 'left' | 'center' | 'right'): boolean {
-    return this.withContentHistory(() => { this.applyBlockStyle('text-align', align); });
-  }
 
-  clearSelectionFormat(): boolean {
-    const ctx = this.editor.getDoc();
-    const engine = new MarkEngine(ctx as any);
-    return this.withContentHistory(() => { engine.clearFormat(); });
-  }
-
-  getActiveSelectionMarks(): Set<MarkType> {
-    const ctx = this.editor.getDoc();
-    const engine = new MarkEngine(ctx as any);
-    return engine.getActiveMarks();
-  }
 }
 
 export default GlobalEditable;
