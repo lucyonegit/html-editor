@@ -34,16 +34,6 @@ export function useSelectionFormatting(editor: HTMLEditor | null): SelectionForm
     const view = editor.getDoc().view;
     if (!doc || !view) return;
 
-    const getBlockAncestor = (el: HTMLElement | null) => {
-      let cur: HTMLElement | null = el;
-      while (cur && cur !== doc.body) {
-        const display = view.getComputedStyle(cur).display;
-        if (display !== 'inline') return cur;
-        cur = cur.parentElement;
-      }
-      return doc.body as HTMLElement;
-    };
-
     const readFormatting = () => {
       const sel = doc.getSelection();
       if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
@@ -62,13 +52,43 @@ export function useSelectionFormatting(editor: HTMLEditor | null): SelectionForm
         return;
       }
       const range = sel.getRangeAt(0);
-      const container = range.commonAncestorContainer.nodeType === 1
-        ? (range.commonAncestorContainer as HTMLElement)
-        : (range.commonAncestorContainer.parentNode as HTMLElement);
-      const el = container || doc.body;
-      const cs = view.getComputedStyle(el);
-      const block = getBlockAncestor(el);
-      const bs = view.getComputedStyle(block);
+
+      // Get all text nodes in the selection
+      const textNodes: Node[] = [];
+      const walker = doc.createTreeWalker(
+        range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+          ? range.commonAncestorContainer.parentNode as Node
+          : range.commonAncestorContainer,
+        NodeFilter.SHOW_TEXT,
+        null
+      );
+
+      let node: Node | null;
+      while ((node = walker.nextNode())) {
+        if (range.intersectsNode(node)) {
+          textNodes.push(node);
+        }
+      }
+
+      // If no text nodes found, fall back to container
+      if (textNodes.length === 0) {
+        const container = range.commonAncestorContainer.nodeType === 1
+          ? (range.commonAncestorContainer as HTMLElement)
+          : (range.commonAncestorContainer.parentNode as HTMLElement);
+        textNodes.push(container);
+      }
+
+      // Check if ALL text nodes have each style
+      let isBold = true;
+      let isItalic = true;
+      let isUnderline = true;
+      let isStrikeThrough = true;
+      let color = '';
+      let backgroundColor = '';
+      let fontSize = '';
+      let fontFamily = '';
+      let textAlign: string = 'left';
+
       const toHex = (input: string): string => {
         const s = input.trim().toLowerCase();
         if (!s || s === 'transparent') return '';
@@ -94,22 +114,72 @@ export function useSelectionFormatting(editor: HTMLEditor | null): SelectionForm
         }
         return '';
       };
-      const fw = cs.fontWeight;
-      const isBold = fw === 'bold' || parseInt(fw as any, 10) >= 600;
-      const deco = cs.textDecorationLine || cs.textDecoration;
-      const isUnderline = typeof deco === 'string' && deco.indexOf('underline') >= 0;
-      const isStrikeThrough = typeof deco === 'string' && deco.indexOf('line-through') >= 0;
-      const isItalic = cs.fontStyle === 'italic';
+
+      textNodes.forEach((node, index) => {
+        const el = node.nodeType === Node.TEXT_NODE
+          ? (node.parentNode as HTMLElement)
+          : (node as HTMLElement);
+
+        if (!el) return;
+
+        const cs = view.getComputedStyle(el);
+
+        // Check bold
+        const fw = cs.fontWeight;
+        const nodeBold = fw === 'bold' || parseInt(fw as any, 10) >= 600;
+        if (!nodeBold) isBold = false;
+
+        // Check italic
+        const nodeItalic = cs.fontStyle === 'italic';
+        if (!nodeItalic) isItalic = false;
+
+        // Check underline and strikethrough
+        const deco = cs.textDecorationLine || cs.textDecoration;
+        const nodeUnderline = typeof deco === 'string' && deco.indexOf('underline') >= 0;
+        const nodeStrikeThrough = typeof deco === 'string' && deco.indexOf('line-through') >= 0;
+        if (!nodeUnderline) isUnderline = false;
+        if (!nodeStrikeThrough) isStrikeThrough = false;
+
+        // For color, fontSize, fontFamily - use first node's value
+        if (index === 0) {
+          color = toHex(cs.color);
+          fontSize = cs.fontSize;
+          fontFamily = cs.fontFamily;
+        }
+      });
+
+      // Get block ancestor for textAlign and backgroundColor
+      const container = range.commonAncestorContainer.nodeType === 1
+        ? (range.commonAncestorContainer as HTMLElement)
+        : (range.commonAncestorContainer.parentNode as HTMLElement);
+      const el = container || doc.body;
+
+      const getBlockAncestor = (el: HTMLElement | null) => {
+        let cur: HTMLElement | null = el;
+        while (cur && cur !== doc.body) {
+          const display = view.getComputedStyle(cur).display;
+          if (display !== 'inline') return cur;
+          cur = cur.parentElement;
+        }
+        return doc.body as HTMLElement;
+      };
+
+      const block = getBlockAncestor(el);
+      const bs = view.getComputedStyle(block);
+      const cs = view.getComputedStyle(el);
+      backgroundColor = toHex(bs.backgroundColor || cs.backgroundColor);
+      textAlign = bs.textAlign as any;
+
       setState({
         isBold,
         isItalic,
         isUnderline,
         isStrikeThrough,
-        color: toHex(cs.color),
-        backgroundColor: toHex(bs.backgroundColor || cs.backgroundColor),
-        fontSize: cs.fontSize,
-        fontFamily: cs.fontFamily,
-        textAlign: bs.textAlign as any,
+        color,
+        backgroundColor,
+        fontSize,
+        fontFamily,
+        textAlign,
         collapsed: false,
       });
     };

@@ -54,10 +54,10 @@ export class Editor {
     this._history = [];
     this._historyIndex = -1;
     this._isUndoRedo = false;
-    
+
     // 保存初始状态
     this._saveHistory();
-    
+
     // 监听输入变化，保存历史
     this.element.addEventListener('input', () => {
       if (!this._isUndoRedo) {
@@ -68,17 +68,17 @@ export class Editor {
 
   _saveHistory(): void {
     const html = this.element.innerHTML;
-    
+
     // 如果和当前状态相同，不保存
     if (this._history[this._historyIndex] === html) return;
-    
+
     // 删除当前位置之后的历史
     this._history = this._history.slice(0, this._historyIndex + 1);
-    
+
     // 添加新状态
     this._history.push(html);
     this._historyIndex = this._history.length - 1;
-    
+
     // 限制历史记录数量
     if (this._history.length > 100) {
       this._history.shift();
@@ -120,7 +120,7 @@ export class Editor {
         this.element.removeAttribute('data-placeholder');
       }
     };
-    
+
     this.element.addEventListener('input', checkPlaceholder);
     this.element.addEventListener('focus', checkPlaceholder);
     this.element.addEventListener('blur', checkPlaceholder);
@@ -129,7 +129,7 @@ export class Editor {
 
   _setupSelectionListener(): void {
     this._selectionChangeCallbacks = [];
-    
+
     this.ctx.document.addEventListener('selectionchange', () => {
       const selection = this.ctx.view.getSelection();
       if (selection && selection.anchorNode && this.element.contains(selection.anchorNode)) {
@@ -148,13 +148,13 @@ export class Editor {
   getSelection(): SelectionResult | null {
     const selection = this.ctx.view.getSelection();
     if (!selection || selection.rangeCount === 0) return null;
-    
+
     const range = selection.getRangeAt(0);
-    
+
     if (!this.element.contains(range.commonAncestorContainer)) {
       return null;
     }
-    
+
     return { selection, range };
   }
 
@@ -187,7 +187,7 @@ export class Editor {
   _getTextNodesInRange(range: Range): Node[] {
     const textNodes: Node[] = [];
     const walker = this.ctx.document.createTreeWalker(
-      range.commonAncestorContainer.nodeType === Node.TEXT_NODE 
+      range.commonAncestorContainer.nodeType === Node.TEXT_NODE
         ? range.commonAncestorContainer.parentNode as Node
         : range.commonAncestorContainer,
       NodeFilter.SHOW_TEXT,
@@ -256,13 +256,8 @@ export class Editor {
 
     const { range } = sel;
     const textNodes = this._getTextNodesInRange(range);
-    
-    if (textNodes.length === 0) return false;
 
-    // 检查是否所有节点都已有此格式
-    const allHaveFormat = textNodes.every(node => 
-      this._hasFormat(node, tagName, null, null).has
-    );
+    if (textNodes.length === 0) return false;
 
     const newNodes: Node[] = [];
 
@@ -272,46 +267,109 @@ export class Editor {
 
       if (!selected || !parent) return;
 
-      const fragment = this.ctx.document.createDocumentFragment();
+      // 检查当前文本节点是否在目标格式标签内
+      const formatCheck = this._hasFormat(textNode, tagName, null, null);
+      const isInFormatTag = formatCheck.has;
+      const formatElement = formatCheck.element as HTMLElement | null;
 
-      // 前面未选中的部分
-      if (before) {
-        fragment.appendChild(this.ctx.document.createTextNode(before));
-      }
-
-      // 选中的部分
-      if (allHaveFormat) {
-        // 移除格式：直接插入文本
-        const textOnly = this.ctx.document.createTextNode(selected);
-        fragment.appendChild(textOnly);
-        newNodes.push(textOnly);
+      if (isInFormatTag && formatElement) {
+        // 节点在格式标签内 - 移除格式（拆分父级格式标签）
+        this._splitFormattedElement(formatElement, textNode as Text, before, selected, after, newNodes);
       } else {
-        // 添加格式：用标签包裹
+        // 节点不在格式标签内 - 添加格式（用标签包裹）
+        const fragment = this.ctx.document.createDocumentFragment();
+
+        if (before) {
+          fragment.appendChild(this.ctx.document.createTextNode(before));
+        }
+
         const wrapper = this.ctx.document.createElement(tagName);
         Object.assign(wrapper.style, styles);
         wrapper.textContent = selected;
         fragment.appendChild(wrapper);
         newNodes.push(wrapper);
-      }
 
-      // 后面未选中的部分
-      if (after) {
-        fragment.appendChild(this.ctx.document.createTextNode(after));
-      }
+        if (after) {
+          fragment.appendChild(this.ctx.document.createTextNode(after));
+        }
 
-      parent.replaceChild(fragment, textNode);
+        parent.replaceChild(fragment, textNode);
+      }
     });
-
-    // 如果是移除格式，需要解除父级标签包裹
-    if (allHaveFormat) {
-      newNodes.forEach(node => {
-        this._unwrapFromTag(node, tagName);
-      });
-    }
 
     // 重新选中处理后的内容
     this._selectNodes(newNodes);
     return true;
+  }
+
+  /**
+   * 拆分格式化元素，移除选中部分的格式
+   */
+  _splitFormattedElement(
+    formatElement: HTMLElement,
+    textNode: Text,
+    before: string,
+    selected: string,
+    after: string,
+    newNodes: Node[]
+  ): void {
+    const parent = formatElement.parentNode;
+    if (!parent) return;
+
+    const fragment = this.ctx.document.createDocumentFragment();
+
+    // 收集格式元素中的所有内容
+    const allContent: Node[] = Array.from(formatElement.childNodes);
+    const textNodeIndex = allContent.indexOf(textNode);
+
+    if (textNodeIndex === -1) return;
+
+    // 创建三个部分：before格式元素、纯文本、after格式元素
+    const beforeNodes: Node[] = [];
+    const afterNodes: Node[] = [];
+
+    // 收集当前文本节点之前的所有节点
+    for (let i = 0; i < textNodeIndex; i++) {
+      beforeNodes.push(allContent[i].cloneNode(true));
+    }
+
+    // 如果当前文本节点有before部分，也加入beforeNodes
+    if (before) {
+      beforeNodes.push(this.ctx.document.createTextNode(before));
+    }
+
+    // 如果当前文本节点有after部分，加入afterNodes
+    if (after) {
+      afterNodes.push(this.ctx.document.createTextNode(after));
+    }
+
+    // 收集当前文本节点之后的所有节点
+    for (let i = textNodeIndex + 1; i < allContent.length; i++) {
+      afterNodes.push(allContent[i].cloneNode(true));
+    }
+
+    // 构建新的DOM结构
+    // 1. before部分（保持格式）
+    if (beforeNodes.length > 0) {
+      const beforeElement = formatElement.cloneNode(false) as HTMLElement;
+      beforeNodes.forEach(node => beforeElement.appendChild(node));
+      fragment.appendChild(beforeElement);
+    }
+
+    // 2. selected部分（移除格式）
+    const plainText = this.ctx.document.createTextNode(selected);
+    fragment.appendChild(plainText);
+    newNodes.push(plainText);
+
+    // 3. after部分（保持格式）
+    if (afterNodes.length > 0) {
+      const afterElement = formatElement.cloneNode(false) as HTMLElement;
+      afterNodes.forEach(node => afterElement.appendChild(node));
+      fragment.appendChild(afterElement);
+    }
+
+    // 替换原格式元素
+    parent.replaceChild(fragment, formatElement);
   }
 
   /**
@@ -342,7 +400,7 @@ export class Editor {
 
     const { range } = sel;
     const textNodes = this._getTextNodesInRange(range);
-    
+
     if (textNodes.length === 0) return false;
 
     const newNodes: Node[] = [];
@@ -384,7 +442,7 @@ export class Editor {
 
     const selection = this.ctx.view.getSelection();
     if (!selection) return;
-    
+
     const range = this.ctx.document.createRange();
 
     const firstNode = nodes[0];
@@ -490,7 +548,7 @@ export class Editor {
 
     const { range } = sel;
     const textNodes = this._getTextNodesInRange(range);
-    
+
     const newTextNodes: Node[] = [];
 
     textNodes.forEach(textNode => {
@@ -501,7 +559,7 @@ export class Editor {
 
       // 创建纯文本节点
       const plainText = this.ctx.document.createTextNode(selected);
-      
+
       // 找到最近的块级父元素
       let blockParent: Node | null = parent;
       while (blockParent && blockParent !== this.element) {
@@ -564,7 +622,7 @@ export class Editor {
     if (!sel) return;
 
     const { range } = sel;
-    
+
     // 获取当前块级元素
     let block: Node | null = range.commonAncestorContainer;
     while (block && block !== this.element && block.nodeType !== Node.ELEMENT_NODE) {
@@ -595,13 +653,13 @@ export class Editor {
     // 创建新列表
     const list = this.ctx.document.createElement(listType);
     const li = this.ctx.document.createElement('li');
-    
+
     if (range.collapsed) {
       li.innerHTML = '<br>';
     } else {
       li.appendChild(range.extractContents());
     }
-    
+
     list.appendChild(li);
     range.insertNode(list);
 
@@ -638,7 +696,7 @@ export class Editor {
     // 如果没有块级元素，包裹在 div 中
     const div = this.ctx.document.createElement('div');
     div.style.textAlign = alignment.toLowerCase();
-    
+
     const { range } = sel;
     if (!range.collapsed) {
       div.appendChild(range.extractContents());
