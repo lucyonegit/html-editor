@@ -406,7 +406,97 @@ export class Editor {
   }
 
   /**
+   * 在元素的直接子节点中查找包含目标节点的子节点
+   */
+  _findDirectChildContaining(parent: HTMLElement, target: Node): Node | null {
+    for (const child of Array.from(parent.childNodes)) {
+      if (child === target) return child;
+      if (child.contains(target)) return child;
+    }
+    return null;
+  }
+
+  /**
+   * 递归克隆节点，但对包含目标文本节点的分支进行分割处理
+   * 返回三个部分：before、selected、after
+   */
+  _cloneAndSplitNode(
+    node: Node,
+    textNode: Text,
+    before: string,
+    selected: string,
+    after: string
+  ): { beforePart: Node | null; selectedPart: Node | null; afterPart: Node | null } {
+    // 如果当前节点就是目标文本节点
+    if (node === textNode) {
+      return {
+        beforePart: before ? this.ctx.document.createTextNode(before) : null,
+        selectedPart: this.ctx.document.createTextNode(selected),
+        afterPart: after ? this.ctx.document.createTextNode(after) : null
+      };
+    }
+
+    // 如果是文本节点但不是目标，完整保留
+    if (node.nodeType === Node.TEXT_NODE) {
+      return {
+        beforePart: node.cloneNode(true),
+        selectedPart: null,
+        afterPart: null
+      };
+    }
+
+    // 如果不包含目标节点，完整保留
+    if (!node.contains(textNode)) {
+      return {
+        beforePart: node.cloneNode(true),
+        selectedPart: null,
+        afterPart: null
+      };
+    }
+
+    // 元素节点且包含目标节点：需要递归处理
+    const element = node as HTMLElement;
+    const beforeChildren: Node[] = [];
+    const selectedChildren: Node[] = [];
+    const afterChildren: Node[] = [];
+    let foundTarget = false;
+    let passedTarget = false;
+
+    for (const child of Array.from(element.childNodes)) {
+      if (child === textNode || child.contains(textNode)) {
+        foundTarget = true;
+        const result = this._cloneAndSplitNode(child, textNode, before, selected, after);
+        if (result.beforePart) beforeChildren.push(result.beforePart);
+        if (result.selectedPart) selectedChildren.push(result.selectedPart);
+        if (result.afterPart) afterChildren.push(result.afterPart);
+        passedTarget = true;
+      } else if (!foundTarget) {
+        // 目标之前的节点归入 before
+        beforeChildren.push(child.cloneNode(true));
+      } else if (passedTarget) {
+        // 目标之后的节点归入 after
+        afterChildren.push(child.cloneNode(true));
+      }
+    }
+
+    // 构建三个部分的元素
+    const createElementWithChildren = (children: Node[]): HTMLElement | null => {
+      if (children.length === 0) return null;
+      const el = element.cloneNode(false) as HTMLElement;
+      children.forEach(c => el.appendChild(c));
+      return el;
+    };
+
+    return {
+      beforePart: createElementWithChildren(beforeChildren),
+      selectedPart: createElementWithChildren(selectedChildren),
+      afterPart: createElementWithChildren(afterChildren)
+    };
+  }
+
+  /**
    * 拆分格式化元素，移除选中部分的格式
+   * 支持复杂嵌套格式和多子节点的情况
    */
   _splitFormattedElement(
     formatElement: HTMLElement,
@@ -419,60 +509,97 @@ export class Editor {
     const parent = formatElement.parentNode;
     if (!parent) return;
 
-    const fragment = this.ctx.document.createDocumentFragment();
-
-    // 收集格式元素中的所有内容
+    const finalFragment = this.ctx.document.createDocumentFragment();
     const allContent: Node[] = Array.from(formatElement.childNodes);
-    const textNodeIndex = allContent.indexOf(textNode);
 
-    if (textNodeIndex === -1) return;
+    // 找到包含 textNode 的直接子节点的索引
+    let targetChildIndex = -1;
+    let targetChild: Node | null = null;
 
-    // 创建三个部分：before格式元素、纯文本、after格式元素
+    for (let i = 0; i < allContent.length; i++) {
+      const child = allContent[i];
+      if (child === textNode || child.contains(textNode)) {
+        targetChildIndex = i;
+        targetChild = child;
+        break;
+      }
+    }
+
+    if (targetChildIndex === -1 || !targetChild) return;
+
+    // 收集目标子节点之前的所有节点（保持外层格式）
     const beforeNodes: Node[] = [];
-    const afterNodes: Node[] = [];
-
-    // 收集当前文本节点之前的所有节点
-    for (let i = 0; i < textNodeIndex; i++) {
+    for (let i = 0; i < targetChildIndex; i++) {
       beforeNodes.push(allContent[i].cloneNode(true));
     }
 
-    // 如果当前文本节点有before部分，也加入beforeNodes
-    if (before) {
-      beforeNodes.push(this.ctx.document.createTextNode(before));
+    // 处理目标子节点
+    let selectedContent: Node;
+
+    if (targetChild === textNode) {
+      // 目标就是文本节点本身
+      if (before) {
+        beforeNodes.push(this.ctx.document.createTextNode(before));
+      }
+      selectedContent = this.ctx.document.createTextNode(selected);
+    } else if (targetChild.nodeType === Node.ELEMENT_NODE) {
+      // 目标在某个元素节点内部，需要递归处理
+      const result = this._cloneAndSplitNode(targetChild, textNode, before, selected, after);
+
+      if (result.beforePart) {
+        beforeNodes.push(result.beforePart);
+      }
+
+      // 这里的 selectedPart 保留了内部格式，但需要移除外层格式
+      selectedContent = result.selectedPart || this.ctx.document.createTextNode(selected);
+
+      // after 部分单独处理
+      if (result.afterPart) {
+        // 将在后面添加到 afterNodes
+      }
+    } else {
+      // 其他情况，安全退出
+      return;
     }
 
-    // 如果当前文本节点有after部分，加入afterNodes
-    if (after) {
+    // 收集目标子节点之后的所有节点（保持外层格式）
+    const afterNodes: Node[] = [];
+
+    // 处理来自递归分割的 after 部分
+    if (targetChild !== textNode && targetChild.nodeType === Node.ELEMENT_NODE) {
+      const result = this._cloneAndSplitNode(targetChild, textNode, before, selected, after);
+      if (result.afterPart) {
+        afterNodes.push(result.afterPart);
+      }
+    } else if (after) {
       afterNodes.push(this.ctx.document.createTextNode(after));
     }
 
-    // 收集当前文本节点之后的所有节点
-    for (let i = textNodeIndex + 1; i < allContent.length; i++) {
+    for (let i = targetChildIndex + 1; i < allContent.length; i++) {
       afterNodes.push(allContent[i].cloneNode(true));
     }
 
-    // 构建新的DOM结构
-    // 1. before部分（保持格式）
+    // 构建最终的 DOM 结构
+    // 1. before 部分（保持外层格式）
     if (beforeNodes.length > 0) {
       const beforeElement = formatElement.cloneNode(false) as HTMLElement;
       beforeNodes.forEach(node => beforeElement.appendChild(node));
-      fragment.appendChild(beforeElement);
+      finalFragment.appendChild(beforeElement);
     }
 
-    // 2. selected部分（移除格式）
-    const plainText = this.ctx.document.createTextNode(selected);
-    fragment.appendChild(plainText);
-    newNodes.push(plainText);
+    // 2. selected 部分（移除外层格式）
+    finalFragment.appendChild(selectedContent);
+    newNodes.push(selectedContent);
 
-    // 3. after部分（保持格式）
+    // 3. after 部分（保持外层格式）
     if (afterNodes.length > 0) {
       const afterElement = formatElement.cloneNode(false) as HTMLElement;
       afterNodes.forEach(node => afterElement.appendChild(node));
-      fragment.appendChild(afterElement);
+      finalFragment.appendChild(afterElement);
     }
 
     // 替换原格式元素
-    parent.replaceChild(fragment, formatElement);
+    parent.replaceChild(finalFragment, formatElement);
   }
 
   /**
