@@ -134,9 +134,27 @@ export function useSelectionFormatting(editor: HTMLEditor | null): SelectionForm
         if (!nodeItalic) isItalic = false;
 
         // Check underline and strikethrough
+        // Note: text-decoration is NOT inherited, so we must check for <u>/<s> tags in ancestor chain
         const deco = cs.textDecorationLine || cs.textDecoration;
-        const nodeUnderline = typeof deco === 'string' && deco.indexOf('underline') >= 0;
-        const nodeStrikeThrough = typeof deco === 'string' && deco.indexOf('line-through') >= 0;
+        let nodeUnderline = typeof deco === 'string' && deco.indexOf('underline') >= 0;
+        let nodeStrikeThrough = typeof deco === 'string' && deco.indexOf('line-through') >= 0;
+
+        // Also check for <u> and <s> tags in ancestors (since text-decoration doesn't inherit)
+        if (!nodeUnderline || !nodeStrikeThrough) {
+          let ancestor: HTMLElement | null = el;
+          while (ancestor && ancestor !== doc.body) {
+            const tagName = ancestor.tagName.toUpperCase();
+            if (!nodeUnderline && tagName === 'U') {
+              nodeUnderline = true;
+            }
+            if (!nodeStrikeThrough && (tagName === 'S' || tagName === 'STRIKE' || tagName === 'DEL')) {
+              nodeStrikeThrough = true;
+            }
+            if (nodeUnderline && nodeStrikeThrough) break;
+            ancestor = ancestor.parentElement;
+          }
+        }
+
         if (!nodeUnderline) isUnderline = false;
         if (!nodeStrikeThrough) isStrikeThrough = false;
 
