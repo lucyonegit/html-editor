@@ -249,6 +249,7 @@ export class Editor {
 
   /**
    * 用指定标签包裹选中文本（支持切换）
+   * 新逻辑：只有当选区内所有文本都有该格式时才移除，否则全部添加格式
    */
   _wrapWithTag(tagName: string, styles: Partial<CSSStyleDeclaration> = {}): boolean {
     const sel = this.getSelection();
@@ -259,6 +260,22 @@ export class Editor {
 
     if (textNodes.length === 0) return false;
 
+    // 首先检查是否所有文本节点都有该格式
+    const formatCheckResults = textNodes.map(textNode => {
+      const { selected } = this._splitTextNode(textNode as Text, range);
+      if (!selected) return { hasFormat: true, textNode, formatElement: null }; // 空节点视为已有格式
+      const formatCheck = this._hasFormat(textNode, tagName, null, null);
+      return {
+        hasFormat: formatCheck.has,
+        textNode,
+        formatElement: formatCheck.element as HTMLElement | null
+      };
+    });
+
+    // 只有当所有节点都有格式时才移除格式，否则全部添加格式
+    const allHaveFormat = formatCheckResults.every(r => r.hasFormat);
+    const shouldRemove = allHaveFormat;
+
     const newNodes: Node[] = [];
 
     textNodes.forEach(textNode => {
@@ -267,16 +284,15 @@ export class Editor {
 
       if (!selected || !parent) return;
 
-      // 检查当前文本节点是否在目标格式标签内
       const formatCheck = this._hasFormat(textNode, tagName, null, null);
       const isInFormatTag = formatCheck.has;
       const formatElement = formatCheck.element as HTMLElement | null;
 
-      if (isInFormatTag && formatElement) {
-        // 节点在格式标签内 - 移除格式（拆分父级格式标签）
+      if (shouldRemove && isInFormatTag && formatElement) {
+        // 移除格式模式：只有在节点确实有格式时才移除
         this._splitFormattedElement(formatElement, textNode as Text, before, selected, after, newNodes);
-      } else {
-        // 节点不在格式标签内 - 添加格式（用标签包裹）
+      } else if (!shouldRemove && !isInFormatTag) {
+        // 添加格式模式：只有在节点没有格式时才添加
         const fragment = this.ctx.document.createDocumentFragment();
 
         if (before) {
@@ -294,12 +310,99 @@ export class Editor {
         }
 
         parent.replaceChild(fragment, textNode);
+      } else if (!shouldRemove && isInFormatTag && formatElement) {
+        // 添加格式模式，但节点已有格式：保持原样，只处理选区边界
+        const { before: b, selected: s, after: a } = this._splitTextNode(textNode as Text, range);
+        if (b || a) {
+          // 需要处理选区边界：保持格式标签但分割文本
+          this._keepFormatButSplitBoundary(formatElement, textNode as Text, b, s, a, newNodes);
+        } else {
+          // 整个节点都被选中且已有格式，保持原样
+          newNodes.push(formatElement);
+        }
       }
     });
 
     // 重新选中处理后的内容
     this._selectNodes(newNodes);
     return true;
+  }
+
+  /**
+   * 保持格式标签但在选区边界分割文本（不移除格式）
+   */
+  _keepFormatButSplitBoundary(
+    formatElement: HTMLElement,
+    textNode: Text,
+    before: string,
+    selected: string,
+    after: string,
+    newNodes: Node[]
+  ): void {
+    const parent = formatElement.parentNode;
+    if (!parent) return;
+
+    const fragment = this.ctx.document.createDocumentFragment();
+
+    // 收集格式元素中的所有内容
+    const allContent: Node[] = Array.from(formatElement.childNodes);
+    const textNodeIndex = allContent.indexOf(textNode);
+
+    if (textNodeIndex === -1) return;
+
+    // 创建before部分（保持格式，但不包含在选区内）
+    if (before) {
+      const beforeNodes: Node[] = [];
+      for (let i = 0; i < textNodeIndex; i++) {
+        beforeNodes.push(allContent[i].cloneNode(true));
+      }
+      beforeNodes.push(this.ctx.document.createTextNode(before));
+
+      if (beforeNodes.length > 0) {
+        const beforeElement = formatElement.cloneNode(false) as HTMLElement;
+        beforeNodes.forEach(node => beforeElement.appendChild(node));
+        fragment.appendChild(beforeElement);
+      }
+    } else {
+      // 没有before文本，但可能有之前的节点
+      for (let i = 0; i < textNodeIndex; i++) {
+        const nodeClone = allContent[i].cloneNode(true);
+        const wrapper = formatElement.cloneNode(false) as HTMLElement;
+        wrapper.appendChild(nodeClone);
+        fragment.appendChild(wrapper);
+      }
+    }
+
+    // 创建selected部分（保持格式，包含在选区内）
+    const selectedElement = formatElement.cloneNode(false) as HTMLElement;
+    selectedElement.textContent = selected;
+    fragment.appendChild(selectedElement);
+    newNodes.push(selectedElement);
+
+    // 创建after部分（保持格式，但不包含在选区内）
+    if (after) {
+      const afterNodes: Node[] = [this.ctx.document.createTextNode(after)];
+      for (let i = textNodeIndex + 1; i < allContent.length; i++) {
+        afterNodes.push(allContent[i].cloneNode(true));
+      }
+
+      if (afterNodes.length > 0) {
+        const afterElement = formatElement.cloneNode(false) as HTMLElement;
+        afterNodes.forEach(node => afterElement.appendChild(node));
+        fragment.appendChild(afterElement);
+      }
+    } else {
+      // 没有after文本，但可能有之后的节点
+      for (let i = textNodeIndex + 1; i < allContent.length; i++) {
+        const nodeClone = allContent[i].cloneNode(true);
+        const wrapper = formatElement.cloneNode(false) as HTMLElement;
+        wrapper.appendChild(nodeClone);
+        fragment.appendChild(wrapper);
+      }
+    }
+
+    // 替换原格式元素
+    parent.replaceChild(fragment, formatElement);
   }
 
   /**
