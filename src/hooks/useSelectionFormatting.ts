@@ -12,6 +12,7 @@ export interface SelectionFormatting {
   fontFamily: string;
   textAlign: 'left' | 'center' | 'right' | 'start' | 'end' | 'justify' | string;
   collapsed: boolean;
+  currentTextLevel: 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
 }
 
 export function useSelectionFormatting(editor: HTMLEditor | null): SelectionFormatting {
@@ -26,6 +27,7 @@ export function useSelectionFormatting(editor: HTMLEditor | null): SelectionForm
     fontFamily: '',
     textAlign: 'left',
     collapsed: true,
+    currentTextLevel: 'p'
   });
 
   useEffect(() => {
@@ -37,6 +39,7 @@ export function useSelectionFormatting(editor: HTMLEditor | null): SelectionForm
     const readFormatting = () => {
       const sel = doc.getSelection();
       if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+        const currentTextLevel = editor.globalEditable?.queryHeading() || 'p';
         setState({
           isBold: false,
           isItalic: false,
@@ -48,6 +51,7 @@ export function useSelectionFormatting(editor: HTMLEditor | null): SelectionForm
           fontFamily: '',
           textAlign: 'left',
           collapsed: true,
+          currentTextLevel
         });
         return;
       }
@@ -185,6 +189,7 @@ export function useSelectionFormatting(editor: HTMLEditor | null): SelectionForm
       const block = getBlockAncestor(el);
       const bs = view.getComputedStyle(block);
       const cs = view.getComputedStyle(el);
+      const currentTextLevel = editor.globalEditable?.queryHeading() || 'p';
       backgroundColor = toHex(bs.backgroundColor || cs.backgroundColor);
       textAlign = bs.textAlign as any;
 
@@ -199,6 +204,7 @@ export function useSelectionFormatting(editor: HTMLEditor | null): SelectionForm
         fontFamily,
         textAlign,
         collapsed: false,
+        currentTextLevel
       });
     };
 

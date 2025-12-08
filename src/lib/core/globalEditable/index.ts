@@ -217,6 +217,27 @@ export class GlobalEditable {
     return engine.queryAlign();
   }
 
+  /**
+   * 设置标题级别
+   * @param level - 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'p' (普通段落)
+   */
+  setHeading(level: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'p'): boolean {
+    const ctx = this.editor.getDoc();
+    const engine = new Editor(ctx as any, { placeholder: '' });
+    const action = () => engine.setHeading(level);
+    return this.withContentHistory(action);
+  }
+
+  /**
+   * 查询当前标题级别
+   * @returns 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'p' | null
+   */
+  queryHeading(): 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'p' | null {
+    const ctx = this.editor.getDoc();
+    const engine = new Editor(ctx as any, { placeholder: '' });
+    return engine.queryHeading();
+  }
+
 }
 
 export default GlobalEditable;

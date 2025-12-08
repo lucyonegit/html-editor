@@ -1034,6 +1034,166 @@ export class Editor {
   }
 
   /**
+   * 标题类型
+   */
+  static readonly HEADING_LEVELS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'] as const;
+
+  /**
+   * 设置标题级别
+   * @param level - 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'p' (普通段落)
+   */
+  setHeading(level: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'p'): void {
+    const sel = this.getSelection();
+    if (!sel) return;
+
+    const { range } = sel;
+
+    // 查找当前所在的块级元素
+    let currentBlock: HTMLElement | null = null;
+    let node: Node | null = range.commonAncestorContainer;
+
+    while (node && node !== this.element) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const element = node as HTMLElement;
+        const tagName = element.tagName.toLowerCase();
+        // 查找可以转换的块级元素
+        if (['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div'].includes(tagName)) {
+          currentBlock = element;
+          break;
+        }
+      }
+      node = node.parentNode;
+    }
+
+    if (currentBlock) {
+      // 已有块级元素，替换为新的标题/段落
+      const newElement = this.ctx.document.createElement(level);
+
+      // 复制内容和样式
+      newElement.innerHTML = currentBlock.innerHTML;
+      if (currentBlock.style.textAlign) {
+        newElement.style.textAlign = currentBlock.style.textAlign;
+      }
+
+      // 替换元素
+      currentBlock.parentNode?.replaceChild(newElement, currentBlock);
+
+      // 重新选中
+      const newRange = this.ctx.document.createRange();
+      newRange.selectNodeContents(newElement);
+      const selection = this.ctx.view.getSelection();
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(newRange);
+      }
+    } else {
+      // 没有找到块级元素
+      // 检查光标是否在 <br> 附近
+      let brElement: HTMLElement | null = null;
+      let checkNode: Node | null = range.commonAncestorContainer;
+
+      // 检查当前节点或其子节点是否是 <br>
+      if (checkNode.nodeType === Node.ELEMENT_NODE) {
+        const el = checkNode as HTMLElement;
+        if (el.tagName.toLowerCase() === 'br') {
+          brElement = el;
+        }
+      }
+
+      // 检查相邻节点
+      if (!brElement && range.startContainer.nodeType === Node.ELEMENT_NODE) {
+        const container = range.startContainer as HTMLElement;
+        const childAtOffset = container.childNodes[range.startOffset];
+        if (childAtOffset && childAtOffset.nodeType === Node.ELEMENT_NODE) {
+          const el = childAtOffset as HTMLElement;
+          if (el.tagName.toLowerCase() === 'br') {
+            brElement = el;
+          }
+        }
+        // 也检查前一个节点
+        const prevChild = container.childNodes[range.startOffset - 1];
+        if (!brElement && prevChild && prevChild.nodeType === Node.ELEMENT_NODE) {
+          const el = prevChild as HTMLElement;
+          if (el.tagName.toLowerCase() === 'br') {
+            brElement = el;
+          }
+        }
+      }
+
+      if (brElement) {
+        // 找到 <br>，用 heading 替换它
+        const newElement = this.ctx.document.createElement(level);
+        newElement.innerHTML = '<br>';
+        brElement.parentNode?.replaceChild(newElement, brElement);
+
+        // 将光标移到新元素内
+        const newRange = this.ctx.document.createRange();
+        newRange.setStart(newElement, 0);
+        newRange.collapse(true);
+        const selection = this.ctx.view.getSelection();
+        if (selection) {
+          selection.removeAllRanges();
+          selection.addRange(newRange);
+        }
+      } else if (range.collapsed) {
+        // 光标位置但没有找到 br：创建空标题
+        const newElement = this.ctx.document.createElement(level);
+        newElement.innerHTML = '<br>';
+        range.insertNode(newElement);
+
+        const newRange = this.ctx.document.createRange();
+        newRange.setStart(newElement, 0);
+        newRange.collapse(true);
+        const selection = this.ctx.view.getSelection();
+        if (selection) {
+          selection.removeAllRanges();
+          selection.addRange(newRange);
+        }
+      } else {
+        // 有选中内容：包裹为标题
+        const contents = range.extractContents();
+        const newElement = this.ctx.document.createElement(level);
+        newElement.appendChild(contents);
+        range.insertNode(newElement);
+
+        const newRange = this.ctx.document.createRange();
+        newRange.selectNodeContents(newElement);
+        const selection = this.ctx.view.getSelection();
+        if (selection) {
+          selection.removeAllRanges();
+          selection.addRange(newRange);
+        }
+      }
+    }
+
+    this._saveHistory();
+  }
+
+  /**
+   * 查询当前标题级别
+   * @returns 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'p' | null
+   */
+  queryHeading(): 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'p' | null {
+    const sel = this.getSelection();
+    if (!sel) return null;
+
+    let node: Node | null = sel.range.commonAncestorContainer;
+    while (node && node !== this.element) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const tagName = (node as HTMLElement).tagName.toLowerCase();
+        if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
+          return tagName as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+        }
+        if (tagName === 'p') {
+          return 'p';
+        }
+      }
+      node = node.parentNode;
+    }
+    return 'p'; // 默认为普通段落
+  }
+
+  /**
    * 插入链接
    */
   insertLink(url: string): void {
