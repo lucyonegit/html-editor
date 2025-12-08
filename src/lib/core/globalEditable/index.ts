@@ -1,6 +1,6 @@
 import { HTMLEditor } from '../editor';
 import { createContentChangeCommand } from '../historyManager/commands';
-import {Editor} from './markEngine'
+import { Editor } from './markEngine'
 import type { MarkSpec } from './markEngine/type';
 
 export class GlobalEditable {
@@ -97,7 +97,7 @@ export class GlobalEditable {
     if (this.handlers.keydown) doc.document.body.removeEventListener('keydown', this.handlers.keydown);
     if (this.handlers.selectionchange) doc.document.removeEventListener('selectionchange', this.handlers.selectionchange);
     this.handlers = {};
-    }
+  }
 
   private enable(): void {
     this.editor.clearSelection();
@@ -137,7 +137,7 @@ export class GlobalEditable {
   private toggleMark(spec: MarkSpec): boolean {
     const ctx = this.editor.getDoc();
     const engine = new Editor(ctx as any, { placeholder: '' });
-    const action = ()=>engine.toggle(spec);
+    const action = () => engine.toggle(spec);
     return this.withContentHistory(action);
   }
 
@@ -173,6 +173,48 @@ export class GlobalEditable {
   }
   applySelectionLink(href: string): boolean {
     return this.toggleMark({ type: 'link', attrs: { href } });
+  }
+
+  /**
+   * 设置文本对齐方式
+   * @param alignment - 'left' | 'center' | 'right'
+   */
+  applySelectionAlign(alignment: 'left' | 'center' | 'right'): boolean {
+    const ctx = this.editor.getDoc();
+    const engine = new Editor(ctx as any, { placeholder: '' });
+    const action = () => engine.align(alignment);
+    return this.withContentHistory(action);
+  }
+
+  /**
+   * 左对齐
+   */
+  applySelectionAlignLeft(): boolean {
+    return this.applySelectionAlign('left');
+  }
+
+  /**
+   * 居中对齐
+   */
+  applySelectionAlignCenter(): boolean {
+    return this.applySelectionAlign('center');
+  }
+
+  /**
+   * 右对齐
+   */
+  applySelectionAlignRight(): boolean {
+    return this.applySelectionAlign('right');
+  }
+
+  /**
+   * 查询当前段落的对齐方式
+   * @returns 'left' | 'center' | 'right' | null
+   */
+  queryAlign(): 'left' | 'center' | 'right' | null {
+    const ctx = this.editor.getDoc();
+    const engine = new Editor(ctx as any, { placeholder: '' });
+    return engine.queryAlign();
   }
 
 }

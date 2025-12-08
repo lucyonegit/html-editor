@@ -902,13 +902,118 @@ export class Editor {
     selection.removeAllRanges();
     selection.addRange(newRange);
   }
+  /**
+   * 对齐方式类型
+   */
+  static readonly ALIGN_LEFT = 'left';
+  static readonly ALIGN_CENTER = 'center';
+  static readonly ALIGN_RIGHT = 'right';
 
   /**
-   * 对齐方式
+   * 查找选区最近的可对齐父元素
    */
-  align(alignment: string): void {
+  _findNearestAlignableElement(node: Node): HTMLElement | null {
+    let current: Node | null = node;
+
+    while (current && current !== this.element) {
+      if (current.nodeType === Node.ELEMENT_NODE) {
+        const element = current as HTMLElement;
+        const tagName = element.tagName.toLowerCase();
+
+        // 匹配常见的段落级元素和行内元素
+        if (['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote', 'td', 'th',
+          'span', 'a', 'strong', 'em', 'u', 's', 'b', 'i'].includes(tagName)) {
+          return element;
+        }
+      }
+      current = current.parentNode;
+    }
+
+    return null;
+  }
+
+  /**
+   * 设置文本对齐方式
+   * 策略：
+   * 1. 找到选区最近的父元素，直接设置其 textAlign 样式
+   * 2. 如果选区全是文本节点，用 span 包裹整个文本节点并设置对齐
+   * @param alignment - 'left' | 'center' | 'right'
+   */
+  align(alignment: 'left' | 'center' | 'right'): void {
     const sel = this.getSelection();
     if (!sel) return;
+
+    const { range } = sel;
+
+    // 找到选区最近的可对齐元素
+    const targetElement = this._findNearestAlignableElement(range.commonAncestorContainer);
+
+    if (targetElement) {
+      const display = this.ctx.view.getComputedStyle(targetElement).display;
+
+      // 如果是行内元素，需要先转换为块级才能应用 text-align
+      if (display === 'inline' || display === 'inline-block') {
+        targetElement.style.display = 'block';
+      }
+
+      // 直接设置对齐方式，不做任何 DOM 操作
+      targetElement.style.textAlign = alignment;
+      this._saveHistory();
+      return;
+    }
+
+    // 没有找到合适的元素，检查是否是纯文本节点
+    // 如果 commonAncestorContainer 是文本节点，用 span 包裹整个文本节点
+    const ancestor = range.commonAncestorContainer;
+
+    if (ancestor.nodeType === Node.TEXT_NODE) {
+      // 获取整个文本节点
+      const textNode = ancestor as Text;
+      const parent = textNode.parentNode;
+
+      if (parent) {
+        // 创建 span 包裹整个文本节点
+        const wrapper = this.ctx.document.createElement('span');
+        wrapper.style.display = 'block';
+        wrapper.style.textAlign = alignment;
+
+        // 用 wrapper 替换文本节点
+        parent.insertBefore(wrapper, textNode);
+        wrapper.appendChild(textNode);
+
+        this._saveHistory();
+      }
+    }
+  }
+
+  /**
+   * 左对齐
+   */
+  alignLeft(): void {
+    this.align('left');
+  }
+
+  /**
+   * 居中对齐
+   */
+  alignCenter(): void {
+    this.align('center');
+  }
+
+  /**
+   * 右对齐
+   */
+  alignRight(): void {
+    this.align('right');
+  }
+
+  /**
+   * 查询当前段落的对齐方式
+   * @returns 'left' | 'center' | 'right' | null
+   */
+  queryAlign(): 'left' | 'center' | 'right' | null {
+    const sel = this.getSelection();
+    if (!sel) return null;
 
     let block: Node | null = sel.range.commonAncestorContainer;
     while (block && block !== this.element) {
@@ -916,22 +1021,16 @@ export class Editor {
         const element = block as HTMLElement;
         const display = this.ctx.view.getComputedStyle(element).display;
         if (display === 'block' || display === 'list-item') {
-          element.style.textAlign = alignment.toLowerCase();
-          return;
+          const textAlign = element.style.textAlign ||
+            this.ctx.view.getComputedStyle(element).textAlign;
+          if (textAlign === 'center') return 'center';
+          if (textAlign === 'right') return 'right';
+          return 'left'; // 默认左对齐
         }
       }
       block = block.parentNode;
     }
-
-    // 如果没有块级元素，包裹在 div 中
-    const div = this.ctx.document.createElement('div');
-    div.style.textAlign = alignment.toLowerCase();
-
-    const { range } = sel;
-    if (!range.collapsed) {
-      div.appendChild(range.extractContents());
-      range.insertNode(div);
-    }
+    return 'left';
   }
 
   /**
