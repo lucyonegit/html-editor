@@ -47,7 +47,6 @@ export class Editor {
     this._setupPlaceholder();
     this._setupSelectionListener();
     this._setupHistory();
-    console.log('editor init successfully');
   }
 
   _setupHistory(): void {
@@ -622,6 +621,45 @@ export class Editor {
   }
 
   /**
+   * 查找可复用的样式 span 祖先元素
+   * 如果文本节点的祖先链中有一个 span 元素设置了该样式，且选区覆盖了该 span 的全部内容，
+   * 则可以直接复用该 span 来更新样式，避免创建嵌套层
+   */
+  _findReusableStyleSpan(
+    textNode: Text,
+    styleProp: keyof CSSStyleDeclaration,
+    range: Range
+  ): HTMLSpanElement | null {
+    let current: Node | null = textNode.parentNode;
+
+    while (current && current !== this.element) {
+      if (
+        current.nodeType === Node.ELEMENT_NODE &&
+        (current as HTMLElement).tagName === 'SPAN'
+      ) {
+        const span = current as HTMLSpanElement;
+        const style = span.style as any;
+
+        // 检查这个 span 是否设置了目标样式属性
+        if (style[styleProp]) {
+          // 检查选区是否完全覆盖这个 span 的内容
+          // 通过比较选区文本和 span 文本来判断
+          const spanText = span.textContent || '';
+          const rangeText = range.toString();
+
+          if (spanText === rangeText) {
+            // 选区完全覆盖了这个 span 的内容，可以复用
+            return span;
+          }
+        }
+      }
+      current = current.parentNode;
+    }
+
+    return null;
+  }
+
+  /**
    * 用样式包裹选中文本
    */
   _wrapWithStyle(styleProp: keyof CSSStyleDeclaration, styleValue: string): boolean {
@@ -632,6 +670,21 @@ export class Editor {
     const textNodes = this._getTextNodesInRange(range);
 
     if (textNodes.length === 0) return false;
+
+    // 优化：检查是否可以直接复用现有的样式 span
+    // 当只有一个文本节点时，检查其祖先是否有可复用的样式 span
+    if (textNodes.length === 1) {
+      const textNode = textNodes[0] as Text;
+      const reusableSpan = this._findReusableStyleSpan(textNode, styleProp, range);
+
+      if (reusableSpan) {
+        // 直接更新现有 span 的样式值，而不是创建新的嵌套层
+        (reusableSpan.style as any)[styleProp] = styleValue;
+        // 保持选区不变
+        this._selectNodes([reusableSpan]);
+        return true;
+      }
+    }
 
     const newNodes: Node[] = [];
 
