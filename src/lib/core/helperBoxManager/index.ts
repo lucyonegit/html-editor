@@ -32,7 +32,7 @@ export class HelperBoxManager {
     }
   }
   
-   updatePostion(position: Position) {
+  updatePostion(position: Position) {
     if (!this.element) return;
     const { document, view } = this.editor.getDoc();
     if(!view || !document) return;
@@ -49,13 +49,11 @@ export class HelperBoxManager {
       offsetTop -= mt;
       offsetLeft -= ml;
     }
-    console.log(position);
     this.element.style.width = `${position.width}px`;
     this.element.style.height = `${position.height}px`;
     this.element.style.top = `${offsetTop + scrollTop }px`;
     this.element.style.left = `${offsetLeft + scrollLeft }px`;
   }
-
 
   // 创建高亮框,根据渲染帧刷新位置（解决dom有动画的case）
   createHighlightTracker() {
