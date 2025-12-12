@@ -183,6 +183,27 @@ export class Editor {
   /**
    * 获取选区内的所有文本节点
    */
+  /**
+   * 检查文本节点是否是表格结构元素的直接子节点中的空白文本
+   * 这些空白节点（如 th 和 th 之间的换行和缩进）如果被包裹会破坏表格结构
+   */
+  _isTableStructureWhitespace(node: Node): boolean {
+    const parent = node.parentNode;
+    if (!parent || parent.nodeType !== Node.ELEMENT_NODE) return false;
+    
+    const parentTag = (parent as HTMLElement).tagName.toLowerCase();
+    // 表格结构元素：不应该有直接的文本内容子节点（空白除外）
+    const tableStructureTags = ['table', 'tbody', 'thead', 'tfoot', 'tr', 'colgroup'];
+    
+    if (tableStructureTags.includes(parentTag)) {
+      // 检查文本内容是否只是空白字符
+      const text = node.textContent || '';
+      return /^\s*$/.test(text);
+    }
+    
+    return false;
+  }
+
   _getTextNodesInRange(range: Range): Node[] {
     const textNodes: Node[] = [];
     const walker = this.ctx.document.createTreeWalker(
@@ -196,6 +217,10 @@ export class Editor {
     let node: Node | null;
     while ((node = walker.nextNode())) {
       if (range.intersectsNode(node)) {
+        // 跳过表格结构元素之间的空白文本节点
+        if (this._isTableStructureWhitespace(node)) {
+          continue;
+        }
         textNodes.push(node);
       }
     }
